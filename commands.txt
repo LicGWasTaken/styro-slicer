@@ -1,0 +1,3 @@
+docker run -it -v /workspaces/styro-slicer:/workspace pymesh/pymesh
+docker exec -it CONTAINER_NAME /bin/bash
+cd /workspace/code
