@@ -29,12 +29,12 @@ def cleanup(mesh):
     result = pymesh.remove_duplicated_faces(mesh)
     output_mesh = result[0]
     mesh = output_mesh
-    helpers.print_bp('removing duplicate faces...') #TODO add a check for weather there were actually duplicated faces
+    helpers.print_bp('removing duplicate faces') #TODO add a check for weather there were actually duplicated faces
 
     # Remove degenerate triangles (= triangles with 0 area)
     result = pymesh.remove_degenerated_triangles(mesh)
     output_mesh == result[0]
     mesh = output_mesh
-    helpers.print_bp('removing degenerate triangles...')
+    helpers.print_bp('removing degenerate triangles')
 
     return mesh

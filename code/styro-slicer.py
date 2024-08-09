@@ -15,19 +15,24 @@ def check_arguments():
     # Check for proper usage
     argv_length = len(sys.argv)
     if argv_length < 2:
-        helpers.print_error('no arguments passed, running with default settings')
+        helpers.print_bp('no arguments passed, running with default settings')
+        return 1
+    for arg in sys.argv: # Look for a valid path
+        if os.path.isfile(arg) and not arg == 'styro-slicer.py':
+            for format in SUPPORTED_FORMATS:
+                if format not in arg:
+                    helpers.print_error(arg + ': invalid file format')
+                    return 2
+            valid_path = True
+            break
+        valid_path = False
+    if not valid_path:
+        helpers.print_bp('no valid file path passed, using default mesh')
         return 1
     for arg in sys.argv:
-        if arg not in VALID_ARGVS and not (arg == sys.argv[0] or arg == sys.argv[1]):
-            helpers.print_error('invalid argument, check README for usage')
+        if arg not in VALID_ARGVS and not (arg == 'styro-slicer.py' or os.path.isfile(arg)):
+            helpers.print_error('invalid arguments, check README for usage')
             return 2
-    for format in SUPPORTED_FORMATS:
-        if format not in sys.argv[1]:
-            helpers.print_error('invalid file format')
-            return 2
-    if not os.path.isfile(sys.argv[1]):
-        helpers.print_error('invalid file path')
-        return 2
     
     return 0
 
