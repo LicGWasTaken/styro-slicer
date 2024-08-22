@@ -1,2 +1,3 @@
 trimesh[easy]
+matplotlib
 colorama

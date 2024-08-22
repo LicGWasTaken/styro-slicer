@@ -1,6 +1,6 @@
 import sys, os
-import numpy as np, trimesh
-
+import numpy as np
+import trimesh
 import helpers
 
 DEFAULT_MESH_PATH = '/workspace/obj/cube.stl'
