@@ -4,9 +4,10 @@ import numpy as np, trimesh
 import helpers
 
 DEFAULT_MESH_PATH = '/workspace/obj/cube.stl'
+MESH_FOLDER_PATH = '/workspace/obj/'
 SUPPORTED_FORMATS = ['.stl']
 VALID_ARGVS = []
-MATERIAL_SIZES = [[60, 20, 100], [20, 20, 20]] # xyz
+MATERIAL_SIZES = [[60, 20, 100], [20, 20, 20]]
 
 def check_arguments():
     print('checking command line arguments...')
@@ -17,19 +18,17 @@ def check_arguments():
         helpers.print_bp('no arguments passed, running with default settings')
         return 1
     for arg in sys.argv: # Look for a valid path
-        if os.path.isfile(arg) and not arg == 'styro-slicer.py':
+        if (os.path.isfile(arg) or os.path.isfile(MESH_FOLDER_PATH + arg)) and not arg == 'styro-slicer.py':
             for format in SUPPORTED_FORMATS:
                 if format not in arg:
                     helpers.print_error(arg + ': invalid file format')
                     return 2
-            valid_path = True
             break
-        valid_path = False
-    if not valid_path:
+    else:
         helpers.print_bp('no valid file path passed, using default mesh')
         return 1
     for arg in sys.argv:
-        if arg not in VALID_ARGVS and not (arg == 'styro-slicer.py' or os.path.isfile(arg)):
+        if arg not in VALID_ARGVS and not (arg == 'styro-slicer.py' or os.path.isfile(arg) or os.path.isfile(MESH_FOLDER_PATH + arg)):
             helpers.print_error('invalid arguments, check README for usage')
             return 2
     
@@ -43,7 +42,7 @@ def main():
     elif var == 1:
         mesh_path = DEFAULT_MESH_PATH
     else:
-        mesh_path = sys.argv[1]
+        mesh_path = sys.argv[1] if os.path.isfile(sys.argv[1]) else MESH_FOLDER_PATH + sys.argv[1]
 
     # ---------- trimesh ----------
 
@@ -68,10 +67,14 @@ def main():
         # Slice mesh into submeshes TODO
         return 3
         
-    # Center mesh to world
+    # Center mesh to world origin
     to_origin = oriented_bounds[0]
     mesh.apply_transform(to_origin)
 
+    # 'Slice' mesh
+    plane_normal = (0, 0, 1)
+    lines = trimesh.intersections.mesh_plane(mesh, plane_normal, plane_origin=(0, 0, 0), return_faces=True)
+    print(lines)                                
     # ---------- END ----------
     return
 
