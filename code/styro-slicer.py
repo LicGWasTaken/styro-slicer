@@ -1,13 +1,12 @@
-import pymesh
-import sys
-import os
+import sys, os
+import numpy as np, trimesh
 
-from mesh_cleanup import cleanup
 import helpers
 
-DEFAULT_MESH_PATH = '/workspace/obj/low.stl'
+DEFAULT_MESH_PATH = '/workspace/obj/cube.stl'
 SUPPORTED_FORMATS = ['.stl']
-VALID_ARGVS = ['cleanup']
+VALID_ARGVS = []
+MATERIAL_SIZES = [[60, 20, 100], [20, 20, 20]] # xyz
 
 def check_arguments():
     print('checking command line arguments...')
@@ -46,14 +45,34 @@ def main():
     else:
         mesh_path = sys.argv[1]
 
-    # Load the passed mesh file
-    print("loading mesh at " + mesh_path + "...")
-    mesh = pymesh.load_mesh(mesh_path)
+    # ---------- trimesh ----------
 
-# Cleanup mesh
-    if 'cleanup' in sys.argv:
-        cleanup(mesh=mesh)
+    # Load mesh
+    mesh = trimesh.load_mesh(mesh_path)  
+    if not mesh.is_watertight:
+        helpers.print_error('mesh not watertight')
+        return 2
+    
+    # Get mesh boundaries
+    oriented_bounds = trimesh.bounds.oriented_bounds(mesh)
 
+    # Check if mesh fits within available sizes
+    extents = oriented_bounds[1]
+    sizes = sorted(MATERIAL_SIZES, key=lambda x: np.prod(x))
+    for size in sizes:
+        if all(s < l for s, l in zip(sorted(extents, reverse=True), sorted(size, reverse=True))):
+            helpers.print_bp('size ' + str(size) + ' fits')
+            break
+    else:
+        helpers.print_error('mesh does not fit within available material sizes')
+        # Slice mesh into submeshes TODO
+        return 3
+        
+    # Center mesh to world
+    to_origin = oriented_bounds[0]
+    mesh.apply_transform(to_origin)
+
+    # ---------- END ----------
     return
 
 if __name__ == '__main__':

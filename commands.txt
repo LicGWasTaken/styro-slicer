@@ -1,8 +1,2 @@
-docker run -it -v /workspaces/styro-slicer:/workspace pymesh/pymesh
-docker exec -it CONTAINER_NAME /bin/bash
-cd /workspace/code
-
--- 9.8.2024 --
-
-docker build -t custom .
-docker run -it -v /workspaces/styro-slicer:/workspace custom
+docker build -t trimesh-env .
+docker run -it --rm -v $(pwd)/code:/workspace/code -v $(pwd)/obj:/workspace/obj trimesh-env
