@@ -6,8 +6,9 @@ import helpers, plotter
 DEFAULT_MESH_PATH = '/workspace/obj/cube.stl'
 MESH_FOLDER_PATH = '/workspace/obj/'
 SUPPORTED_FORMATS = ['.stl']
-VALID_ARGVS = []
+VALID_ARGVS = ['offset', 'mat-size']
 MATERIAL_SIZES = [[60, 20, 100], [20, 20, 20]]
+DEFAULT_OFFSET = 5
 
 def check_arguments():
     print('checking command line arguments...')
@@ -57,24 +58,38 @@ def main():
     extents = oriented_bounds[1]
     sizes = sorted(MATERIAL_SIZES, key=lambda x: np.prod(x))
     for size in sizes:
+        # Sort extents and sizes descending and compare them
         if all(s < l for s, l in zip(sorted(extents, reverse=True), sorted(size, reverse=True))):
             helpers.print_bp('size ' + str(size) + ' fits')
             break
     else:
         helpers.print_error('mesh does not fit within available material sizes')
         # Slice mesh into submeshes TODO
-        return 3
+        # return 3
+    
+    scaled_extents = np.rint(extents) + DEFAULT_OFFSET
         
     # Center mesh to world origin
     to_origin = oriented_bounds[0]
     mesh.apply_transform(to_origin)
 
-    # 'Slice' mesh
-    plane_normal = (0, 0, 1)
-    lines = trimesh.intersections.mesh_plane(mesh, plane_normal, plane_origin=(0, 0, 1))
-    plotter.plot_lines(lines, fmt='bo')
+    # Align longest extent to z axis
+    vectors = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+    max_extent_idx = np.where(extents == np.max(extents))[0][0]
+    mesh.apply_transform(trimesh.geometry.align_vectors(vectors[max_extent_idx], vectors[2]))
 
-    return
+    # 'Slice' mesh
+    # Rotates 3-D vector around z-axis
+    steps = 8
+    theta = 2 * np.pi / steps
+    lines = np.empty((1, 2, 3))
+    plane_normal = np.array([0, 1, 0])
+    for i in range(steps):
+        plane_normal = helpers.rotate_vector_z(plane_normal, theta)
+        loop = trimesh.intersections.mesh_plane(mesh, plane_normal, plane_origin=(0, 0, 0))
+        lines = np.concatenate([lines, loop])
+    plotter.plot_lines(lines, color='black', marker='')
+    return 0
 
 if __name__ == '__main__':
     main()
