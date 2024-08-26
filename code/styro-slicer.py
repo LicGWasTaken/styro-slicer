@@ -1,7 +1,7 @@
 import sys, os
 import numpy as np
 import trimesh
-import helpers
+import helpers, plotter
 
 DEFAULT_MESH_PATH = '/workspace/obj/cube.stl'
 MESH_FOLDER_PATH = '/workspace/obj/'
@@ -44,8 +44,6 @@ def main():
     else:
         mesh_path = sys.argv[1] if os.path.isfile(sys.argv[1]) else MESH_FOLDER_PATH + sys.argv[1]
 
-    # ---------- trimesh ----------
-
     # Load mesh
     mesh = trimesh.load_mesh(mesh_path)  
     if not mesh.is_watertight:
@@ -73,9 +71,9 @@ def main():
 
     # 'Slice' mesh
     plane_normal = (0, 0, 1)
-    lines = trimesh.intersections.mesh_plane(mesh, plane_normal, plane_origin=(0, 0, 0), return_faces=True)
-    print(lines)                                
-    # ---------- END ----------
+    lines = trimesh.intersections.mesh_plane(mesh, plane_normal, plane_origin=(0, 0, 1))
+    plotter.plot_lines(lines, fmt='bo')
+
     return
 
 if __name__ == '__main__':
