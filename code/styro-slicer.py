@@ -12,7 +12,6 @@ VALID_ARGVS = ["offset", "mat-size"]
 MATERIAL_SIZES = [[60, 20, 100], [20, 30, 40]]
 DEFAULT_OFFSET = 5
 
-
 def check_arguments():
     print("checking command line arguments...")
 
@@ -44,7 +43,6 @@ def check_arguments():
             helpers.print_error("invalid arguments, check README for usage")
             return 2
     return 0
-
 
 def redefine_points(in_lines):
     """Make points equidistant"""
@@ -131,30 +129,29 @@ def main():
 
     # Align longest extent to z axis
     extents = np.rint(extents) + DEFAULT_OFFSET
-    vectors = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+    axes = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
     max_extent_idx = np.where(extents == np.max(extents))[0][0]
     mesh.apply_transform(
-        trimesh.geometry.align_vectors(vectors[max_extent_idx], vectors[2])
+        trimesh.geometry.align_vectors(axes[max_extent_idx], axes[2])
     )
 
     # 'Slice' mesh
     steps = 1
-    theta = 0 if steps == 0 else np.pi / steps
-    lines = np.zeros((1, 2), dtype=Vector3)  # TODO Set this to be the starting position
+    angle = 0 if steps == 0 else np.pi / steps
     plane_normal = Vector3(0, 1, 0)
     plane_origin = Vector3(0, 0, 0)
     for i in range(steps):
-        plane_normal = plane_normal.rotate_z(theta)
-        loop = trimesh.intersections.mesh_plane(
+        plane_normal = plane_normal.rotate_z(angle)
+        coords = trimesh.intersections.mesh_plane(
             mesh, plane_normal.list(), plane_origin.list()
         )
-        # points = redefine_points(loop)
-
-        lines = np.concatenate([lines, loop])
-    plotter.plot_lines(lines, color="purple", marker="+")
+        vectors = []
+        for line in coords:
+            vectors.append([Vector3(line[0]), Vector3(line[1])])
+    plotter.plot_lines(vectors, color="purple", marker="+")
     return 0
-
 
 if __name__ == "__main__":
     main()
     print()
+

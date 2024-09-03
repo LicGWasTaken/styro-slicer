@@ -6,7 +6,6 @@ class Vector3:
             self.x = args[0]
             self.y = args[1]
             self.z = args[2]
-
         elif len(args) == 1:
             if isinstance(args[0], list):
                 arr = args[0]
@@ -15,7 +14,6 @@ class Vector3:
                 self.x = arr[0]
                 self.y = arr[1]
                 self.z = arr[2]
-
             elif isinstance(args[0], np.ndarray):
                 np_arr = args[0]
                 if len(np_arr.shape) != 1 or len(np_arr) != 3:
@@ -23,18 +21,20 @@ class Vector3:
                 self.x = np_arr[0].item()
                 self.y = np_arr[1].item()
                 self.z = np_arr[2].item()
-
             else:
                 raise TypeError('Unsupported type for initialization')
-            
         else:
             raise TypeError('Class Vector3 requires either 3 arguments or a single list/np.array of 3 elements')
 
-    def __str__(self):
-        return f'({self.x}, {self.y}, {self.z})'
+    def __repr__(self):
+        decimals = 2
+        return f'({round(self.x), decimals}, {round(self.y), decimals}, {round(self.z), decimals})'
     
     def list(self):
         return [self.x, self.y, self.z]
+    
+    def np_array(self):
+        return np.array([self.x, self.y, self.z])
 
     def magnitude(self):
         # return np.linalg.norm(vector)
@@ -52,5 +52,4 @@ class Vector3:
             ]
         )
         return Vector3(np.dot(R, self.list()))
-
 

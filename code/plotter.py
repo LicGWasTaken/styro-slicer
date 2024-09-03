@@ -2,7 +2,6 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 
-
 def plot_lines(lines, **kwargs):  # color, marker, linestyle
     fig = plt.figure()
     for i in range(4):
@@ -20,11 +19,11 @@ def plot_lines(lines, **kwargs):  # color, marker, linestyle
 
         # Plot lines
         for line in lines:
-            p0 = line[0]
-            p1 = line[1]
-            xs = [p0[0], p1[0]]
-            ys = [p0[1], p1[1]]
-            zs = [p0[2], p1[2]]
+            v0 = line[0]
+            v1 = line[1]
+            xs = [v0.x, v1.x]
+            ys = [v0.y, v1.y]
+            zs = [v0.z, v1.z]
             ax.plot(xs, ys, zs, **kwargs)
 
         # Set labels
@@ -45,3 +44,4 @@ def plot_lines(lines, **kwargs):  # color, marker, linestyle
 
     # Save as png
     plt.savefig("/workspace/obj/plot.png")
+
