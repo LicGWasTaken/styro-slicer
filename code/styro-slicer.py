@@ -48,30 +48,29 @@ def redefine_coords(in_coords):
     """Make points equidistant"""
     pass
 
-    length = sum(map(lambda v: v.magnitude(), in_coords))
-    print(length)
-    size = np.size(in_coords) / 6  # 3 coordinates per vertex, 2 verteces per line
-    dist = len / size
+    length = sum(v.magnitude() for sub_list in in_coords for v in sub_list)
+    vertex_count = np.size(in_coords) / 6  # 3 coordinates per vertex, 2 verteces per line
+    dist = length / vertex_count
 
-    out_coords = np.zeros((1, 2, 3))
-    i = 1  # Skip the centerpoint
-    prev = in_coords[i][0]
-    while True:
-        dir_vect = in_coords[i][1] - in_coords[i][0]
+    # out_coords = []
+    # i = 0
+    # prev = in_coords[i][0]
+    # while True:
+    #     dir_vect = in_coords[i][1] - in_coords[i][0]
 
-        # Get equidistant point along direction
-        factor = dist / helpers.mag(dir_vect)
-        new = prev + factor * dir_vect
+    #     # Get equidistant point along direction
+    #     factor = dist / helpers.mag(dir_vect)
+    #     new = prev + factor * dir_vect
 
-        # If past the next point, adjust to follow the outline correctly
-        # origin + dir_vect * x = new
-        x = (new[0] - in_coords[0]) / dir_vect[0]
+    #     # If past the next point, adjust to follow the outline correctly
+    #     # origin + dir_vect * x = new
+    #     x = (new[0] - in_coords[0]) / dir_vect[0]
 
-        pct = np.divide((new - in_coords[i][0]), dir_vect)  
-        pct[np.isnan(pct)] = 0 # Replace NaN with 0s to still work when coordinate of dir_vect is 0
-        print(pct)
+    #     pct = np.divide((new - in_coords[i][0]), dir_vect)  
+    #     pct[np.isnan(pct)] = 0 # Replace NaN with 0s to still work when coordinate of dir_vect is 0
+    #     print(pct)
 
-        # if pct > 1:  # TODO this is an array and i need it to be a scalar
+        # if pct > 1:  # TODO this is an list and i need it to be a scalar
         #     i += 1
         #     if i > size:
         #         return out_coords
@@ -80,7 +79,7 @@ def redefine_coords(in_coords):
         #     factor = tmp_dist / helpers.mag(dir_vect)
         #     new = in_coords[i][0] + factor * dir_vect
 
-        # arr = np.array([prev, new])
+        # arr = np.list([prev, new])
         # np.append(out_coords, arr)
         # prev = new
 
@@ -148,10 +147,10 @@ def main():
         coords = trimesh.intersections.mesh_plane(
             mesh, plane_normal.list(), plane_origin.list()
         )
+        tmp = []
         for line in coords:
-            line = ([Vector3(line[0]), Vector3(line[1])])
-            print(line)
-        coords = redefine_coords(coords)
+            tmp.append([Vector3(line[0]), Vector3(line[1])])
+        coords = redefine_coords(tmp)
     plotter.plot_lines(coords, color="purple", marker="+")
     return 0
 

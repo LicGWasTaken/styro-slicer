@@ -30,6 +30,26 @@ class Vector3:
         decimals = 2
         return f'({round(self.x, decimals)} | {round(self.y, decimals)} | {round(self.z, decimals)})'
     
+    # Operator overloads
+    def __add__(self, other):
+        if isinstance(other, Vector3):
+            return Vector3(np.add(self.list(), other.list()))
+        else:
+            return Vector3(np.add(self.list(), other))
+        
+    def __sub__(self, other):
+        if isinstance(other, Vector3):
+            return Vector3(np.subtract(self.list(), other.list()))
+        else:
+            return Vector3(np.subtract(self.list(), other))
+        
+    def __mul__(self, other):
+        pass
+
+    def __div__(self, other):
+        pass
+
+    # Functions
     def list(self):
         return [self.x, self.y, self.z]
     
