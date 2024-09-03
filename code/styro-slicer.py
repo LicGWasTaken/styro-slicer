@@ -44,18 +44,20 @@ def check_arguments():
             return 2
     return 0
 
-def redefine_points(in_lines):
+def redefine_coords(in_coords):
     """Make points equidistant"""
+    pass
 
-    len = helpers.loop_length(in_lines)
-    size = np.size(in_lines) / 6  # 3 coordinates per vertex, 2 verteces per line
+    length = sum(map(lambda v: v.magnitude(), in_coords))
+    print(length)
+    size = np.size(in_coords) / 6  # 3 coordinates per vertex, 2 verteces per line
     dist = len / size
 
-    out_lines = np.zeros((1, 2, 3))
+    out_coords = np.zeros((1, 2, 3))
     i = 1  # Skip the centerpoint
-    prev = in_lines[i][0]
+    prev = in_coords[i][0]
     while True:
-        dir_vect = in_lines[i][1] - in_lines[i][0]
+        dir_vect = in_coords[i][1] - in_coords[i][0]
 
         # Get equidistant point along direction
         factor = dist / helpers.mag(dir_vect)
@@ -63,23 +65,23 @@ def redefine_points(in_lines):
 
         # If past the next point, adjust to follow the outline correctly
         # origin + dir_vect * x = new
-        x = (new[0] - in_lines[0]) / dir_vect[0]
+        x = (new[0] - in_coords[0]) / dir_vect[0]
 
-        pct = np.divide((new - in_lines[i][0]), dir_vect)  
+        pct = np.divide((new - in_coords[i][0]), dir_vect)  
         pct[np.isnan(pct)] = 0 # Replace NaN with 0s to still work when coordinate of dir_vect is 0
         print(pct)
 
         # if pct > 1:  # TODO this is an array and i need it to be a scalar
         #     i += 1
         #     if i > size:
-        #         return out_lines
+        #         return out_coords
         #     tmp_dist = pct - 1 * helpers.mag(dir_vect)
-        #     dir_vect = in_lines[i][1] - in_lines[i][0]
+        #     dir_vect = in_coords[i][1] - in_coords[i][0]
         #     factor = tmp_dist / helpers.mag(dir_vect)
-        #     new = in_lines[i][0] + factor * dir_vect
+        #     new = in_coords[i][0] + factor * dir_vect
 
         # arr = np.array([prev, new])
-        # np.append(out_lines, arr)
+        # np.append(out_coords, arr)
         # prev = new
 
 def subdivide(resolution):
@@ -136,8 +138,9 @@ def main():
     )
 
     # 'Slice' mesh
-    steps = 1
+    steps = 3
     angle = 0 if steps == 0 else np.pi / steps
+    lines = []
     plane_normal = Vector3(0, 1, 0)
     plane_origin = Vector3(0, 0, 0)
     for i in range(steps):
@@ -145,10 +148,11 @@ def main():
         coords = trimesh.intersections.mesh_plane(
             mesh, plane_normal.list(), plane_origin.list()
         )
-        vectors = []
         for line in coords:
-            vectors.append([Vector3(line[0]), Vector3(line[1])])
-    plotter.plot_lines(vectors, color="purple", marker="+")
+            line = ([Vector3(line[0]), Vector3(line[1])])
+            print(line)
+        coords = redefine_coords(coords)
+    plotter.plot_lines(coords, color="purple", marker="+")
     return 0
 
 if __name__ == "__main__":

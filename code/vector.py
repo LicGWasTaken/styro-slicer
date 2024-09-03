@@ -28,7 +28,7 @@ class Vector3:
 
     def __repr__(self):
         decimals = 2
-        return f'({round(self.x), decimals}, {round(self.y), decimals}, {round(self.z), decimals})'
+        return f'({round(self.x, decimals)} | {round(self.y, decimals)} | {round(self.z, decimals)})'
     
     def list(self):
         return [self.x, self.y, self.z]
