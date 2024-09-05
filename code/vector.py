@@ -1,68 +1,98 @@
 import numpy as np
 
 class Vector3:
-    def __init__(self, *args):
+    
+    def __init__(self, *args): 
+        self.decimals = 6 # +0 gets rid of -0
         if len(args) == 3:
-            self.x = args[0]
-            self.y = args[1]
-            self.z = args[2]
+            self.x = round(args[0], self.decimals) + 0
+            self.y = round(args[1], self.decimals) + 0
+            self.z = round(args[2], self.decimals) + 0
         elif len(args) == 1:
             if isinstance(args[0], list):
                 arr = args[0]
                 if len(arr) != 3 or isinstance(arr[0], list):
-                    raise ValueError('Class Vector3 requires a 1D list of 3 elements')
-                self.x = arr[0]
-                self.y = arr[1]
-                self.z = arr[2]
+                    raise ValueError("Class Vector3 requires a 1D list of 3 elements")
+                self.x = round(arr[0], self.decimals) + 0
+                self.y = round(arr[1], self.decimals) + 0
+                self.z = round(arr[2], self.decimals) + 0
             elif isinstance(args[0], np.ndarray):
                 np_arr = args[0]
                 if len(np_arr.shape) != 1 or len(np_arr) != 3:
-                    raise ValueError('Class Vector3 requires a 1D np.array of 3 elements')
-                self.x = np_arr[0].item()
-                self.y = np_arr[1].item()
-                self.z = np_arr[2].item()
+                    raise ValueError(
+                        "Class Vector3 requires a 1D np.array of 3 elements"
+                    )
+                self.x = round(np_arr[0].item(), self.decimals) + 0
+                self.y = round(np_arr[1].item(), self.decimals) + 0
+                self.z = round(np_arr[2].item(), self.decimals) + 0
             else:
-                raise TypeError('Unsupported type for initialization')
+                raise TypeError("Unsupported type for initialization")
         else:
-            raise TypeError('Class Vector3 requires either 3 arguments or a single list/np.array of 3 elements')
+            raise TypeError(
+                "Class Vector3 requires either 3 arguments or a single list/np.array of 3 elements"
+            )
 
     def __repr__(self):
-        decimals = 2
-        return f'({round(self.x, decimals)} | {round(self.y, decimals)} | {round(self.z, decimals)})'
-    
+        decimals = 3
+        x = None if self.x == None else round(self.x, decimals) + 0
+        y = None if self.y == None else round(self.y, decimals) + 0
+        z = None if self.z == None else round(self.z, decimals) + 0
+        return f"({x} | {y} | {z})"
+
     # Operator overloads
+    def __key(self):
+        return (self.x, self.y, self.z)
+
+    def __hash__(self):
+        return hash(self.__key())
+
+    def __eq__(self, other):
+        if isinstance(other, Vector3):
+            return self.__key() == other.__key()
+        else:
+            return NotImplemented
+        
     def __add__(self, other):
         if isinstance(other, Vector3):
             return Vector3(np.add(self.list(), other.list()))
         else:
             return Vector3(np.add(self.list(), other))
-        
+
     def __sub__(self, other):
         if isinstance(other, Vector3):
             return Vector3(np.subtract(self.list(), other.list()))
         else:
             return Vector3(np.subtract(self.list(), other))
-        
-    def __mul__(self, other):
-        pass
 
-    def __div__(self, other):
-        pass
+    def __mul__(self, other):
+        if isinstance(other, Vector3):
+            return Vector3(self.x * other.x, self.y * other.y, self.z * other.z)
+        else:
+            return Vector3(np.multiply(self.list(), other))
+
+    def __truediv__(self, other):
+        if isinstance(other, Vector3):
+            x = None if other.x == 0 else self.x / other.x
+            y = None if other.y == 0 else self.y / other.y
+            z = None if other.z == 0 else self.z / other.z
+            return Vector3(x, y, z)
+        else:
+            return Vector3(np.divide(self.list(), other))
 
     # Functions
     def list(self):
         return [self.x, self.y, self.z]
-    
+
     def np_array(self):
         return np.array([self.x, self.y, self.z])
 
     def magnitude(self):
         # return np.linalg.norm(vector)
         return np.sqrt((np.square(self.x) + np.square(self.y) + np.square(self.z)))
-    
+
     def normalized(self):
         return self.list() / self.magnitude
-    
+
     def rotate_z(self, angle):
         R = np.array(
             [
