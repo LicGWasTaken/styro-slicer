@@ -3,9 +3,9 @@ import numpy as np
 class Vector3:
     
     def __init__(self, *args): 
-        self.decimals = 6 # +0 gets rid of -0
+        self.decimals = 3 # Keep this relatively low, the slicing isn't the most accurate
         if len(args) == 3:
-            self.x = round(args[0], self.decimals) + 0
+            self.x = round(args[0], self.decimals) + 0 # +0 gets rid of -0
             self.y = round(args[1], self.decimals) + 0
             self.z = round(args[2], self.decimals) + 0
         elif len(args) == 1:
@@ -54,21 +54,21 @@ class Vector3:
         
     def __add__(self, other):
         if isinstance(other, Vector3):
-            return Vector3(np.add(self.list(), other.list()))
+            return Vector3(np.add(self.to_list(), other.to_list()))
         else:
-            return Vector3(np.add(self.list(), other))
+            return Vector3(np.add(self.to_list(), other))
 
     def __sub__(self, other):
         if isinstance(other, Vector3):
-            return Vector3(np.subtract(self.list(), other.list()))
+            return Vector3(np.subtract(self.to_list(), other.to_list()))
         else:
-            return Vector3(np.subtract(self.list(), other))
+            return Vector3(np.subtract(self.to_list(), other))
 
     def __mul__(self, other):
         if isinstance(other, Vector3):
             return Vector3(self.x * other.x, self.y * other.y, self.z * other.z)
         else:
-            return Vector3(np.multiply(self.list(), other))
+            return Vector3(np.multiply(self.to_list(), other))
 
     def __truediv__(self, other):
         if isinstance(other, Vector3):
@@ -77,13 +77,13 @@ class Vector3:
             z = None if other.z == 0 else self.z / other.z
             return Vector3(x, y, z)
         else:
-            return Vector3(np.divide(self.list(), other))
+            return Vector3(np.divide(self.to_list(), other))
 
     # Functions
-    def list(self):
+    def to_list(self):
         return [self.x, self.y, self.z]
 
-    def np_array(self):
+    def to_np_array(self):
         return np.array([self.x, self.y, self.z])
 
     def magnitude(self):
@@ -91,7 +91,7 @@ class Vector3:
         return np.sqrt((np.square(self.x) + np.square(self.y) + np.square(self.z)))
 
     def normalized(self):
-        return self.list() / self.magnitude
+        return Vector3(self.to_list() / self.magnitude())
 
     def rotate_z(self, angle):
         R = np.array(
@@ -101,5 +101,5 @@ class Vector3:
                 [0, 0, 1],
             ]
         )
-        return Vector3(np.dot(R, self.list()))
+        return Vector3(np.dot(R, self.to_list()))
 

@@ -7,6 +7,7 @@ WORKDIR /workspace
 # Copy your code into the container
 COPY ./code /workspace/code
 COPY ./obj /workspace/obj
+COPY ./plots /workspace/plots
 COPY requirements.txt /workspace/
 
 # Upgrade pip
@@ -18,3 +19,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Optionally, run a script or start a shell
 # CMD ["python", "test_pymesh.py"]
 CMD ["/bin/bash"]
+

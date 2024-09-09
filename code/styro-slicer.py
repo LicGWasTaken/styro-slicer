@@ -45,68 +45,152 @@ def check_arguments():
             return 2
     return 0
 
-def sort_coords(in_coords):
-    """Sort lines to form a closed loop"""
-    out_coords = []
+def sort_segments(in_slice):
+    """Sort segments to form a closed loop"""
+    out_slice = []
     d = {}
-    for line in in_coords:
-        for v in line:
+    for segment in in_slice:
+        for v in segment:
             if v not in d:
-                d[v] = [in_coords.index(line), None]
+                d[v] = [in_slice.index(segment), None]
             else:
-                d[v] = [d[v][0], in_coords.index(line)]
-    
-    l = list(d) # Instantiate dict into list to enable indexing
+                d[v] = [d[v][0], in_slice.index(segment)]
+
+    l = list(d)  # Instantiate dict into list to enable indexing
     key = l[0]
     idx = d[key][0]
     for i in range(len(d.keys())):
-        v = in_coords[idx][0] if key != in_coords[idx][0] else in_coords[idx][1]
-        out_coords.append([key, v])
+        v = in_slice[idx][0] if key != in_slice[idx][0] else in_slice[idx][1]
+        out_slice.append([key, v])
         key = v
         idx = d[key][0] if idx != d[key][0] else d[key][1]
 
-    return out_coords
-    
-def redefine_coords(in_coords):
+    return out_slice
+
+def redefine_segments(in_slice):
     """Make points equidistant"""
-    out_coords = []
-    in_coords = sort_coords(in_coords)
-    length = sum((line[1] - line[0]).magnitude() for line in in_coords)
-    vertex_count = np.size(in_coords) / 2 # 2 verteces per line
-    dist = length / vertex_count
+    out_slice = []
 
-    i = 0
-    prev = in_coords[i][0]
-    while True:
-        # Get equidistant point along direction
-        dir_vect = in_coords[i][1] - in_coords[i][0]
-        new = prev + dir_vect * (dist / dir_vect.magnitude())
+    # Make sure the input is sorted
+    in_slice = sort_segments(in_slice)
 
-        # If past the next point, adjust to follow the outline correctly 
-        scalar = (new - in_coords[i][0]).magnitude() / dir_vect.magnitude() # origin + dir_vect * scalar = new
-        scalar /= dist
+    # Delete consecutive straight segments
+    prev_segment =  in_slice[0]
+    prev_v = (prev_segment[1] - prev_segment[0]).normalized()
+    for i in range(len(in_slice))[1: ]:
+        segment = in_slice[i]
+        v = (segment[1] - segment[0]).normalized()
         
-        if scalar > 1: 
-            i += 1
-
-            # Exit condition
-            if i >= vertex_count:
-                return out_coords
+        # If the normalized vectors align, merge the segments
+        if prev_v == v:
+            prev_segment = [prev_segment[0], segment[1]]
+        else:
+            if prev_segment not in out_slice and i != 1:
+                out_slice.append(prev_segment)
+            prev_segment = segment
             
-            tmp_dist = (scalar - 1) * dir_vect.magnitude()
-            tmp_dir_vect = in_coords[i][1] - in_coords[i][0]
+        prev_v = v
+    
+    # Close the loop
+    segment = in_slice[0]
+    v = (segment[1] - segment[0]).normalized()
+    if prev_v == v:
+        out_slice.append([prev_segment[0], segment[1]])
+    else:
+        out_slice.append(prev_segment)
+        out_slice.append(segment)
+        
+    return out_slice
 
-            # Keep sharp edges
-            if h.angle_between_vectors(tmp_dir_vect, dir_vect, deg=True) >= 45:
-                new = in_coords[i][0]
-            else:
-                new = in_coords[i][0] + dir_vect * (tmp_dist / dir_vect.magnitude())
+    # -------------- OLD (not functional) -----------------
+    # # Initialize variables
+    # length = sum((segment[1] - segment[0]).magnitude() for segment in in_slice)
+    # vertex_count = np.size(in_slice) / 2  # 2 verteces per segment
+    # dist = length / vertex_count
 
-        out_coords.append([prev, new])
-        prev = new
+    # i = 0
+    # prev = in_slice[i][0]
+    # while True:
+    #     # Get equidistant point along direction
+    #     dir_vect = in_slice[i][1] - in_slice[i][0]
+    #     new = prev + dir_vect * (dist / dir_vect.magnitude())
+
+    #     # If past the next point, adjust to follow the outline correctly
+    #     scalar = (
+    #         new - in_slice[i][0]
+    #     ).magnitude() / dir_vect.magnitude()  # origin + dir_vect * scalar = new
+    #     scalar /= dist
+
+    #     if scalar > 1:
+    #         i += 1
+
+    #         # Exit condition
+    #         if i >= vertex_count:
+    #             return out_coords
+
+    #         tmp_dist = (scalar - 1) * dir_vect.magnitude()
+    #         tmp_dir_vect = in_slice[i][1] - in_slice[i][0]
+
+    #         # Keep sharp edges
+    #         if h.angle_between_vectors(tmp_dir_vect, dir_vect, deg=True) >= 45:
+    #             new = in_slice[i][0]
+    #         else:
+    #             new = in_slice[i][0] + dir_vect * (tmp_dist / dir_vect.magnitude())
+
+    #     out_coords.append([prev, new])
+    #     prev = new
 
 def subdivide(resolution):
     pass
+
+def decimate(resolution):
+    pass
+
+def slice_mesh_axisymmetric(mesh, steps):
+    # Define rotation angle
+    angle = 0 if steps == 0 else np.pi / steps
+
+    # Initialize required values
+    out_coords = []
+    out_slices = []
+    plane_normal = Vector3(0, 1, 0)
+    plane_origin = Vector3(0, 0, 0)
+
+    # Slice the mesh
+    for i in range(steps):
+        plane_normal = plane_normal.rotate_z(angle)
+        slice = trimesh.intersections.mesh_plane(
+            mesh, plane_normal.to_list(), plane_origin.to_list()
+        )
+
+        # Reformat output as Vector3s
+        tmp = []
+        for segment in slice:
+            v3_segment = [Vector3(segment[0]), Vector3(segment[1])]
+            out_coords.append(v3_segment)
+            tmp.append(v3_segment)
+        out_slices.append(tmp)
+
+    # Print results
+    h.print_bp(f"generated {np.size(out_coords)} points")
+
+    return out_slices
+
+def get_normals(mesh, in_coords):
+    out_normals = []
+    vert_normals = mesh.vertex_normals
+    
+    for i in range(len(in_coords)):
+        idx = mesh.kdtree.query(in_coords[i][0].to_list())[1]
+        out_normals[idx] = vert_normals[idx]
+        print(out_normals)
+        return out_normals
+
+def detect_collisions(mesh, in_coords):
+    for segment in in_coords:
+        intersector = trimesh.ray.ray_pyembree.RayMeshIntersector(mesh)
+        # intersector.intersects_location() TODO needs vector normals to work
+    return
 
 def main():
     timer = time.perf_counter()
@@ -131,10 +215,9 @@ def main():
         return 2
 
     # Get mesh boundaries
-    oriented_bounds = trimesh.bounds.oriented_bounds(mesh)
+    to_origin, extents = trimesh.bounds.oriented_bounds(mesh)
 
     # Check if mesh fits within available sizes
-    extents = oriented_bounds[1]
     sizes = sorted(MATERIAL_SIZES, key=lambda x: np.prod(x))
     for size in sizes:
         # Sort extents and sizes descending and compare them
@@ -149,7 +232,6 @@ def main():
         # return 3
 
     # Center mesh to world origin
-    to_origin = oriented_bounds[0]
     mesh.apply_transform(to_origin)
 
     # Align longest extent to z axis
@@ -159,27 +241,23 @@ def main():
     mesh.apply_transform(trimesh.geometry.align_vectors(axes[max_extent_idx], axes[2]))
 
     # 'Slice' mesh
-    steps = 360
-    angle = 0 if steps == 0 else np.pi / steps
-    lines = []
-    plane_normal = Vector3(0, 1, 0)
-    plane_origin = Vector3(0, 0, 0)
-    for i in range(steps):
-        plane_normal = plane_normal.rotate_z(angle)
-        coords = trimesh.intersections.mesh_plane(
-            mesh, plane_normal.list(), plane_origin.list()
-        )
-        tmp = []
-        for line in coords:
-            tmp.append([Vector3(line[0]), Vector3(line[1])])
-        coords = redefine_coords(tmp)
-        # coords = tmp
-        for line in coords:
-            lines.append(line)
-    h.print_bp(f'generated {np.size(lines)} points')
-    # plotter.plot_lines(lines, color="purple", marker="+")
-
-    print(f'time elapsed: {round(time.perf_counter() - timer, 3)}s')
+    coords = []
+    slices = slice_mesh_axisymmetric(mesh, steps=4)
+    for slice in slices:
+        # slice = sort_segments(slice) # Already in redefine_coords
+        slice = redefine_segments(slice)
+       
+        # Covert the slices to a plottable format TODO: just modify plotter
+        for segment in slice:
+            coords.append(segment)
+        
+    # normals = get_normals(mesh, coords)
+    
+    # Plot points using matplotlib
+    file_name = mesh_path[mesh_path.rindex('/') + 1: mesh_path.rindex('.')]
+    plotter.plot_segments(coords, file_name, color="purple", marker="+")
+    
+    print(f"time elapsed: {round(time.perf_counter() - timer, 3)}s")
     return 0
 
 if __name__ == "__main__":
