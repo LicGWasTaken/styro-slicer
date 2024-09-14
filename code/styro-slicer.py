@@ -12,7 +12,7 @@ SUPPORTED_FORMATS = [".stl"]
 VALID_ARGVS = ["offset", "mat-size"]
 MATERIAL_SIZES = [[60, 20, 100], [20, 30, 40]]
 DEFAULT_OFFSET = 5
-STEPS = 2  # doesn't work for 360 for some reason
+STEPS = 8
 
 def check_arguments():
     print("checking command line arguments...")
@@ -60,8 +60,12 @@ def sort_segments(in_slice):
     l = list(d)  # Instantiate dict into list to enable indexing
     key = l[0]
     idx = d[key][0]
-    for i in range(len(d.keys())):
-        v = in_slice[idx][0] if key != in_slice[idx][0] else in_slice[idx][1]
+    for i in range(len(d.keys())):           
+        try:  
+            v = in_slice[idx][0] if key != in_slice[idx][0] else in_slice[idx][1]
+        except TypeError:
+            h.print_error("TypeError in sort_segments, most likely a rounding error. Try decreasing the decimals in of the Vector3 class.")
+            break
         out_slice.append([key, v])
         key = v
         idx = d[key][0] if idx != d[key][0] else d[key][1]

@@ -3,7 +3,7 @@ import numpy as np
 class Vector3:
     
     def __init__(self, *args): 
-        self.decimals = 3 # Keep this relatively low, the slicing isn't the most accurate
+        self.decimals = 2 # Keep this relatively low, the slicing isn't the most accurate
         if len(args) == 3:
             self.x = round(args[0], self.decimals) + 0 # +0 gets rid of -0
             self.y = round(args[1], self.decimals) + 0
