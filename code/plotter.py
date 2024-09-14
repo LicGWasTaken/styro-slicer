@@ -2,13 +2,16 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 
-def plot_segments(segments, file_name, **kwargs):  # color, marker, segmentstyle
+def plot_segments(
+    segments, projection, file_name, **kwargs
+):  # color, marker, segmentstyle
+
     if segments == None:
         return 1
 
     fig = plt.figure()
     for i in range(4):
-        ax = fig.add_subplot(2, 2, i + 1, projection='3d')
+        ax = fig.add_subplot(2, 2, i + 1, projection="3d")
 
         # Rotate view
         if i == 0:
@@ -27,12 +30,22 @@ def plot_segments(segments, file_name, **kwargs):  # color, marker, segmentstyle
             xs = [v0.x, v1.x]
             ys = [v0.y, v1.y]
             zs = [v0.z, v1.z]
-            ax.plot(xs, ys, zs, **kwargs)
+
+            color = kwargs["line_color"]
+            marker = kwargs["line_marker"]
+            ax.plot(xs, ys, zs, color=color, marker=marker)
+
+        # Plot projection
+        if type(projection) != None:
+            for point in projection:
+                color = kwargs["point_color"]
+                marker = kwargs["point_marker"]
+                ax.plot(point[0], point[1], point[2], color=color, marker=marker)
 
         # Set labels
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_zlabel('Z')
+        ax.set_xlabel("X")
+        ax.set_ylabel("Y")
+        ax.set_zlabel("Z")
 
         # Remove tick labels
         if i == 0:
@@ -43,10 +56,10 @@ def plot_segments(segments, file_name, **kwargs):  # color, marker, segmentstyle
             ax.set_yticklabels([])
 
         ax.grid(False)
-        ax.axis('scaled')
+        ax.axis("scaled")
 
     # Save as png
-    plt.savefig('/workspace/plots/' + file_name)
+    plt.savefig("/workspace/plots/" + file_name)
 
     return 0
 

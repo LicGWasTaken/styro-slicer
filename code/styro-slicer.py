@@ -12,6 +12,7 @@ SUPPORTED_FORMATS = [".stl"]
 VALID_ARGVS = ["offset", "mat-size"]
 MATERIAL_SIZES = [[60, 20, 100], [20, 30, 40]]
 DEFAULT_OFFSET = 5
+STEPS = 2  # doesn't work for 360 for some reason
 
 def check_arguments():
     print("checking command line arguments...")
@@ -68,19 +69,19 @@ def sort_segments(in_slice):
     return out_slice
 
 def redefine_segments(in_slice):
-    """Make points equidistant"""
+    """ignore obsolete points"""
     out_slice = []
 
     # Make sure the input is sorted
     in_slice = sort_segments(in_slice)
 
     # Delete consecutive straight segments
-    prev_segment =  in_slice[0]
+    prev_segment = in_slice[0]
     prev_v = (prev_segment[1] - prev_segment[0]).normalized()
-    for i in range(len(in_slice))[1: ]:
+    for i in range(len(in_slice))[1:]:
         segment = in_slice[i]
         v = (segment[1] - segment[0]).normalized()
-        
+
         # If the normalized vectors align, merge the segments
         if prev_v == v:
             prev_segment = [prev_segment[0], segment[1]]
@@ -88,9 +89,9 @@ def redefine_segments(in_slice):
             if prev_segment not in out_slice and i != 1:
                 out_slice.append(prev_segment)
             prev_segment = segment
-            
+
         prev_v = v
-    
+
     # Close the loop
     segment = in_slice[0]
     v = (segment[1] - segment[0]).normalized()
@@ -98,47 +99,9 @@ def redefine_segments(in_slice):
         out_slice.append([prev_segment[0], segment[1]])
     else:
         out_slice.append(prev_segment)
-        out_slice.append(segment)
-        
+        # out_slice.append(segment)
+
     return out_slice
-
-    # -------------- OLD (not functional) -----------------
-    # # Initialize variables
-    # length = sum((segment[1] - segment[0]).magnitude() for segment in in_slice)
-    # vertex_count = np.size(in_slice) / 2  # 2 verteces per segment
-    # dist = length / vertex_count
-
-    # i = 0
-    # prev = in_slice[i][0]
-    # while True:
-    #     # Get equidistant point along direction
-    #     dir_vect = in_slice[i][1] - in_slice[i][0]
-    #     new = prev + dir_vect * (dist / dir_vect.magnitude())
-
-    #     # If past the next point, adjust to follow the outline correctly
-    #     scalar = (
-    #         new - in_slice[i][0]
-    #     ).magnitude() / dir_vect.magnitude()  # origin + dir_vect * scalar = new
-    #     scalar /= dist
-
-    #     if scalar > 1:
-    #         i += 1
-
-    #         # Exit condition
-    #         if i >= vertex_count:
-    #             return out_coords
-
-    #         tmp_dist = (scalar - 1) * dir_vect.magnitude()
-    #         tmp_dir_vect = in_slice[i][1] - in_slice[i][0]
-
-    #         # Keep sharp edges
-    #         if h.angle_between_vectors(tmp_dir_vect, dir_vect, deg=True) >= 45:
-    #             new = in_slice[i][0]
-    #         else:
-    #             new = in_slice[i][0] + dir_vect * (tmp_dist / dir_vect.magnitude())
-
-    #     out_coords.append([prev, new])
-    #     prev = new
 
 def subdivide(resolution):
     pass
@@ -146,19 +109,29 @@ def subdivide(resolution):
 def decimate(resolution):
     pass
 
-def slice_mesh_axisymmetric(mesh, steps):
-    # Define rotation angle
-    angle = 0 if steps == 0 else np.pi / steps
+def rotation_angle(steps, deg):
+    if steps == 0:
+        return 0
+    elif not deg:
+        return np.pi / steps
+    else:
+        return np.pi / steps * 180 / np.pi
+
+def slice_mesh_axisymmetric(mesh, steps, get_plane_normals):
+    angle = rotation_angle(steps, deg=False)
 
     # Initialize required values
     out_coords = []
     out_slices = []
+    out_plane_normals = []
     plane_normal = Vector3(0, 1, 0)
     plane_origin = Vector3(0, 0, 0)
 
     # Slice the mesh
     for i in range(steps):
         plane_normal = plane_normal.rotate_z(angle)
+        if get_plane_normals:
+            out_plane_normals.append(plane_normal)
         slice = trimesh.intersections.mesh_plane(
             mesh, plane_normal.to_list(), plane_origin.to_list()
         )
@@ -174,22 +147,35 @@ def slice_mesh_axisymmetric(mesh, steps):
     # Print results
     h.print_bp(f"generated {np.size(out_coords)} points")
 
+    if get_plane_normals:
+        return out_slices, out_plane_normals
     return out_slices
 
 def get_normals(mesh, in_coords):
     out_normals = []
     vert_normals = mesh.vertex_normals
-    
+
     for i in range(len(in_coords)):
-        idx = mesh.kdtree.query(in_coords[i][0].to_list())[1]
-        out_normals[idx] = vert_normals[idx]
-        print(out_normals)
-        return out_normals
+        idxs = mesh.kdtree.query(in_coords[i][0].to_list(), k=2)[1]
+        v = (vert_normals[idxs[0]] + vert_normals[idxs[1]]) / 2
+
+        out_normals.insert(i, Vector3(v))
+
+    return out_normals
+
+def project_to_plane(in_slice, plane_offset, angle_rad):
+    """Sadly, trimesh.points.project_to_plane seems to be faulty
+    Therefore, I'm forced to implement it myself T-T"""
+    plane_normal = Vector3(0, 1, 0).normalized().to_np_array()
+    coords = [segment[0].rotate_z(-angle_rad).to_list() for segment in in_slice]
+    distances = trimesh.points.point_plane_distance(coords, plane_normal, [0, plane_offset, 0])
+    coords = [point - plane_normal * distances[i] for i, point in enumerate(coords)]
+    return coords
 
 def detect_collisions(mesh, in_coords):
     for segment in in_coords:
         intersector = trimesh.ray.ray_pyembree.RayMeshIntersector(mesh)
-        # intersector.intersects_location() TODO needs vector normals to work
+        # intersector.intersects_location() TODO needs vector normals to work - does it though?
     return
 
 def main():
@@ -242,21 +228,39 @@ def main():
 
     # 'Slice' mesh
     coords = []
-    slices = slice_mesh_axisymmetric(mesh, steps=4)
-    for slice in slices:
-        # slice = sort_segments(slice) # Already in redefine_coords
+    projection = []
+    slices, plane_normals = slice_mesh_axisymmetric(mesh, STEPS, get_plane_normals=True)
+    for i in range(len(slices)):
+        slice = slices[i]
+        plane_normal = plane_normals[i]
+
         slice = redefine_segments(slice)
-       
+        proj = project_to_plane(
+            slice,
+            plane_offset=500,
+            angle_rad=rotation_angle(STEPS, deg=False) * i + 1,
+        )
+
         # Covert the slices to a plottable format TODO: just modify plotter
         for segment in slice:
             coords.append(segment)
-        
-    # normals = get_normals(mesh, coords)
-    
+        for point in proj:
+            projection.append(point)
+
+    normals = get_normals(mesh, coords)
+
     # Plot points using matplotlib
-    file_name = mesh_path[mesh_path.rindex('/') + 1: mesh_path.rindex('.')]
-    plotter.plot_segments(coords, file_name, color="purple", marker="+")
-    
+    file_name = mesh_path[mesh_path.rindex("/") + 1 : mesh_path.rindex(".")]
+    plotter.plot_segments(
+        coords,
+        projection,
+        file_name,
+        line_color="purple",
+        line_marker="+",
+        point_color="blue",
+        point_marker=".",
+    )
+
     print(f"time elapsed: {round(time.perf_counter() - timer, 3)}s")
     return 0
 
