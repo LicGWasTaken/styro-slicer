@@ -1,18 +1,14 @@
-import sys, os
+import sys
+import os
 import numpy as np
 import trimesh
 import time
 
 from vector import Vector3
-import helpers as h, plotter
-
-MESH_FOLDER_PATH = "/workspace/obj/"
-DEFAULT_MESH_PATH = MESH_FOLDER_PATH + "cube.stl"
-SUPPORTED_FORMATS = [".stl"]
-VALID_ARGVS = ["offset", "mat-size"]
-MATERIAL_SIZES = [[60, 20, 100], [20, 30, 40]]
-DEFAULT_OFFSET = 5
-STEPS = 8
+import helpers as h
+import plotter
+import preferences as prefs
+import gcode
 
 def check_arguments():
     print("checking command line arguments...")
@@ -25,9 +21,9 @@ def check_arguments():
     # Look for a valid file path
     for arg in sys.argv:
         if (
-            os.path.isfile(arg) or os.path.isfile(MESH_FOLDER_PATH + arg)
-        ) and not arg == "styro-slicer.py":
-            for format in SUPPORTED_FORMATS:
+            os.path.isfile(arg) or os.path.isfile(prefs.MESH_FOLDER_PATH + arg)
+        ) and not arg == sys.argv[0]:
+            for format in prefs.SUPPORTED_FORMATS:
                 if format not in arg:
                     h.print_error(arg + ": invalid file format")
                     return 2
@@ -37,10 +33,10 @@ def check_arguments():
         return 1
     # Make sure all arguments are allowed
     for arg in sys.argv:
-        if arg not in VALID_ARGVS and not (
-            arg == "styro-slicer.py"
+        if arg not in prefs.VALID_ARGVS and not (
+            arg == sys.argv[0]
             or os.path.isfile(arg)
-            or os.path.isfile(MESH_FOLDER_PATH + arg)
+            or os.path.isfile(prefs.MESH_FOLDER_PATH + arg)
         ):
             h.print_error("invalid arguments, check README for usage")
             return 2
@@ -190,12 +186,12 @@ def main():
     if var == 2:
         return 1
     elif var == 1:
-        mesh_path = DEFAULT_MESH_PATH
+        mesh_path = prefs.DEFAULT_MESH_PATH
     else:
         mesh_path = (
             sys.argv[1]
             if os.path.isfile(sys.argv[1])
-            else MESH_FOLDER_PATH + sys.argv[1]
+            else prefs.MESH_FOLDER_PATH + sys.argv[1]
         )
 
     # Load mesh
@@ -208,7 +204,7 @@ def main():
     to_origin, extents = trimesh.bounds.oriented_bounds(mesh)
 
     # Check if mesh fits within available sizes
-    sizes = sorted(MATERIAL_SIZES, key=lambda x: np.prod(x))
+    sizes = sorted(prefs.MATERIAL_SIZES, key=lambda x: np.prod(x))
     for size in sizes:
         # Sort extents and sizes descending and compare them
         if all(
@@ -225,7 +221,7 @@ def main():
     mesh.apply_transform(to_origin)
 
     # Align longest extent to z axis
-    extents = np.rint(extents) + DEFAULT_OFFSET
+    extents = np.rint(extents) + prefs.DEFAULT_OFFSET
     axes = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
     max_extent_idx = np.where(extents == np.max(extents))[0][0]
     mesh.apply_transform(trimesh.geometry.align_vectors(axes[max_extent_idx], axes[2]))
@@ -233,7 +229,7 @@ def main():
     # 'Slice' mesh
     coords = []
     projection = []
-    slices, plane_normals = slice_mesh_axisymmetric(mesh, STEPS, get_plane_normals=True)
+    slices, plane_normals = slice_mesh_axisymmetric(mesh, prefs.STEPS, get_plane_normals=True)
     for i in range(len(slices)):
         slice = slices[i]
         plane_normal = plane_normals[i]
@@ -242,7 +238,7 @@ def main():
         proj = project_to_plane(
             slice,
             plane_offset=500,
-            angle_rad=rotation_angle(STEPS, deg=False) * i + 1,
+            angle_rad=rotation_angle(prefs.STEPS, deg=False) * i + 1,
         )
 
         # Covert the slices to a plottable format TODO: just modify plotter
@@ -255,14 +251,15 @@ def main():
 
     # Plot points using matplotlib
     file_name = mesh_path[mesh_path.rindex("/") + 1 : mesh_path.rindex(".")]
-    plotter.plot_segments(
-        coords,
-        projection,
-        file_name,
+    plotter.plot(
+        lines=coords,
+        points=projection,
+        # file_name=file_name,
         line_color="purple",
         line_marker="+",
         point_color="blue",
         point_marker=".",
+        # subplots=True,
     )
 
     print(f"time elapsed: {round(time.perf_counter() - timer, 3)}s")

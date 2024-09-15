@@ -1,65 +1,92 @@
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
+import helpers as h
+from vector import Vector3
 
-def plot_segments(
-    segments, projection, file_name, **kwargs
-):  # color, marker, segmentstyle
-
-    if segments == None:
-        return 1
-
-    fig = plt.figure()
-    for i in range(4):
-        ax = fig.add_subplot(2, 2, i + 1, projection="3d")
-
-        # Rotate view
-        if i == 0:
-            ax.view_init(elev=-90, azim=-90, roll=0)
-        elif i == 1:
-            ax.view_init(elev=0, azim=0, roll=90)
-        elif i == 2:
-            ax.view_init(elev=0, azim=-90, roll=0)
+def _plot_lines(ax, lines, color, marker):
+    for l in lines:
+        v0 = l[0]
+        v1 = l[1]
+        if isinstance(v0, Vector3) and isinstance(v1, Vector3):
+            ax.plot([v0.x, v1.x], [v0.y, v1.y], [v0.z, v1.z], color=color, marker=marker)
         else:
-            ax.view_init(elev=20.0, azim=-35, roll=0)
+            ax.plot([v0[0], v1[0]], [v0[1], v1[1]], [v0[2], v1[2]], color=color, marker=marker)
 
-        # Plot segments
-        for segment in segments:
-            v0 = segment[0]
-            v1 = segment[1]
-            xs = [v0.x, v1.x]
-            ys = [v0.y, v1.y]
-            zs = [v0.z, v1.z]
+def _plot_points(ax, points, color, marker):
+    for p in points:
+        ax.plot(p[0], p[1], p[2], color=color, marker=marker)
 
-            color = kwargs["line_color"]
-            marker = kwargs["line_marker"]
-            ax.plot(xs, ys, zs, color=color, marker=marker)
+def plot(**kwargs):
+    # Check for proper usage
+    file_name = "unnamed"
+    lines = None
+    points = None
 
-        # Plot projection
-        if type(projection) != None:
-            for point in projection:
-                color = kwargs["point_color"]
-                marker = kwargs["point_marker"]
-                ax.plot(point[0], point[1], point[2], color=color, marker=marker)
+    for key, value in kwargs.items():        
+        if key == "file_name":
+            file_name = value
+        elif key == "lines":
+            lines = value
+            try:
+                line_color = kwargs["line_color"]
+                line_marker = kwargs["line_marker"]
+            except KeyError:
+                h.print_error("plot lines failed: please include line_color and line_marker")
+                return 1
+        elif key == "points":
+            points = value
+            try:
+                point_color = kwargs["point_color"]
+                point_marker = kwargs["point_marker"]
+            except KeyError:
+                h.print_error("plot points failed: please include point_color and point_marker")
+                return 1
+            
+    if isinstance(lines, list) or isinstance(points, list):
+        fig = plt.figure()
+        for i in range(4):
+            if "subplots" in kwargs and kwargs["subplots"]:
+                ax = fig.add_subplot(2, 2, i + 1, projection="3d")
+            else:
+                if i < 1:
+                    ax = fig.add_subplot(projection="3d")
+                else:
+                    break
 
-        # Set labels
-        ax.set_xlabel("X")
-        ax.set_ylabel("Y")
-        ax.set_zlabel("Z")
+            # Plot values
+            if isinstance(lines, list):
+                _plot_lines(ax, lines, line_color, line_marker)
+            if isinstance(points, list):
+                _plot_points(ax, points, point_color, point_marker)
 
-        # Remove tick labels
-        if i == 0:
-            ax.set_zticklabels([])
-        elif i == 1:
+            # Rotate view
+            if i < 1:
+                ax.view_init(elev=20.0, azim=-35, roll=0)
+            elif i < 2:
+                ax.view_init(elev=-90, azim=-90, roll=0)
+            elif i < 3:
+                ax.view_init(elev=0, azim=-90, roll=0)
+            else:
+                ax.view_init(elev=0, azim=0, roll=90)
+                
+            # Set labels
+            if i != 3:
+                ax.set_xlabel("X")
+            if i != 2:
+                ax.set_ylabel("Y")
+            if i != 1:
+                ax.set_zlabel("Z")
+
+            # Remove tick labels
             ax.set_xticklabels([])
-        elif i == 2:
             ax.set_yticklabels([])
+            ax.set_zticklabels([])
 
-        ax.grid(False)
-        ax.axis("scaled")
-
-    # Save as png
-    plt.savefig("/workspace/plots/" + file_name)
-
-    return 0
+            ax.grid(False)
+            ax.axis("scaled")
+        
+        # Save as png
+        plt.savefig("/workspace/plots/" + file_name)
+        return 0
 

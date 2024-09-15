@@ -8,6 +8,7 @@ WORKDIR /workspace
 COPY ./code /workspace/code
 COPY ./obj /workspace/obj
 COPY ./plots /workspace/plots
+COPY ./output /workspace/output
 COPY requirements.txt /workspace/
 
 # Upgrade pip
