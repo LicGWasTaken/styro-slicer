@@ -1,11 +1,14 @@
 import numpy as np
 
+
 class Vector3:
-    
-    def __init__(self, *args): 
-        self.decimals = 2 # Keep this relatively low, the slicing isn't the most accurate
+
+    def __init__(self, *args):
+        self.decimals = (
+            2  # Keep this relatively low, the slicing isn't the most accurate
+        )
         if len(args) == 3:
-            self.x = round(args[0], self.decimals) + 0 # +0 gets rid of -0
+            self.x = round(args[0], self.decimals) + 0  # +0 gets rid of -0
             self.y = round(args[1], self.decimals) + 0
             self.z = round(args[2], self.decimals) + 0
         elif len(args) == 1:
@@ -51,7 +54,7 @@ class Vector3:
             return self.__key() == other.__key()
         else:
             return NotImplemented
-        
+
     def __add__(self, other):
         if isinstance(other, Vector3):
             return Vector3(np.add(self.to_list(), other.to_list()))
@@ -63,6 +66,9 @@ class Vector3:
             return Vector3(np.subtract(self.to_list(), other.to_list()))
         else:
             return Vector3(np.subtract(self.to_list(), other))
+
+    def __rsub__(self, other):
+        return Vector3(other - self.x, other - self.y, other - self.z)
 
     def __mul__(self, other):
         if isinstance(other, Vector3):
@@ -78,6 +84,9 @@ class Vector3:
             return Vector3(x, y, z)
         else:
             return Vector3(np.divide(self.to_list(), other))
+
+    def __rtruediv__(self, other):
+        return Vector3(other / self.x, other / self.y, other / self.z)
 
     # Functions
     def to_list(self):
@@ -103,3 +112,5 @@ class Vector3:
         )
         return Vector3(np.dot(R, self.to_list()))
 
+    def zero():
+        return Vector3(0, 0, 0)

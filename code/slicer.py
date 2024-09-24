@@ -10,6 +10,7 @@ import plotter
 import preferences as prefs
 import gcode
 
+
 def check_arguments():
     print("checking command line arguments...")
 
@@ -18,7 +19,7 @@ def check_arguments():
     if argv_length < 2:
         h.print_bp("no arguments passed, running with default settings")
         return 1
-    # Look for a valid file path
+    # Look for a valid file path TODO: this throws an error if it finds the same file with another format
     for arg in sys.argv:
         if (
             os.path.isfile(arg) or os.path.isfile(prefs.MESH_FOLDER_PATH + arg)
@@ -42,6 +43,7 @@ def check_arguments():
             return 2
     return 0
 
+
 def sort_segments(in_slice):
     """Sort segments to form a closed loop"""
     out_slice = []
@@ -56,17 +58,20 @@ def sort_segments(in_slice):
     l = list(d)  # Instantiate dict into list to enable indexing
     key = l[0]
     idx = d[key][0]
-    for i in range(len(d.keys())):           
-        try:  
+    for i in range(len(d.keys())):
+        try:
             v = in_slice[idx][0] if key != in_slice[idx][0] else in_slice[idx][1]
         except TypeError:
-            h.print_error("TypeError in sort_segments, most likely a rounding error. Try decreasing the decimals in of the Vector3 class.")
+            h.print_error(
+                "TypeError in sort_segments, most likely a rounding error. Try decreasing the decimals in of the Vector3 class."
+            )
             break
         out_slice.append([key, v])
         key = v
         idx = d[key][0] if idx != d[key][0] else d[key][1]
 
     return out_slice
+
 
 def redefine_segments(in_slice):
     """ignore obsolete points"""
@@ -103,11 +108,14 @@ def redefine_segments(in_slice):
 
     return out_slice
 
+
 def subdivide(resolution):
     pass
 
+
 def decimate(resolution):
     pass
+
 
 def rotation_angle(steps, deg):
     if steps == 0:
@@ -116,6 +124,7 @@ def rotation_angle(steps, deg):
         return np.pi / steps
     else:
         return np.pi / steps * 180 / np.pi
+
 
 def slice_mesh_axisymmetric(mesh, steps, get_plane_normals):
     angle = rotation_angle(steps, deg=False)
@@ -151,6 +160,7 @@ def slice_mesh_axisymmetric(mesh, steps, get_plane_normals):
         return out_slices, out_plane_normals
     return out_slices
 
+
 def get_normals(mesh, in_coords):
     out_normals = []
     vert_normals = mesh.vertex_normals
@@ -163,20 +173,26 @@ def get_normals(mesh, in_coords):
 
     return out_normals
 
+
 def project_to_plane(in_slice, plane_offset, angle_rad):
     """Sadly, trimesh.points.project_to_plane seems to be faulty
     Therefore, I'm forced to implement it myself T-T"""
     plane_normal = Vector3(0, 1, 0).normalized().to_np_array()
     coords = [segment[0].rotate_z(-angle_rad).to_list() for segment in in_slice]
-    distances = trimesh.points.point_plane_distance(coords, plane_normal, [0, plane_offset, 0])
+    distances = trimesh.points.point_plane_distance(
+        coords, plane_normal, [0, plane_offset, 0]
+    )
     coords = [point - plane_normal * distances[i] for i, point in enumerate(coords)]
+
     return coords
+
 
 def detect_collisions(mesh, in_coords):
     for segment in in_coords:
         intersector = trimesh.ray.ray_pyembree.RayMeshIntersector(mesh)
         # intersector.intersects_location() TODO needs vector normals to work - does it though?
     return
+
 
 def main():
     timer = time.perf_counter()
@@ -228,32 +244,42 @@ def main():
 
     # 'Slice' mesh
     coords = []
-    projection = []
-    slices, plane_normals = slice_mesh_axisymmetric(mesh, prefs.STEPS, get_plane_normals=True)
+    XY = []
+    UV = []
+    slices, plane_normals = slice_mesh_axisymmetric(
+        mesh, prefs.STEPS, get_plane_normals=True
+    )
     for i in range(len(slices)):
         slice = slices[i]
-        plane_normal = plane_normals[i]
-
         slice = redefine_segments(slice)
-        proj = project_to_plane(
-            slice,
-            plane_offset=500,
-            angle_rad=rotation_angle(prefs.STEPS, deg=False) * i + 1,
-        )
-
-        # Covert the slices to a plottable format TODO: just modify plotter
         for segment in slice:
             coords.append(segment)
-        for point in proj:
-            projection.append(point)
 
-    normals = get_normals(mesh, coords)
+        plane_offset = sorted(extents)[1] / 2
+        proj = project_to_plane(
+            slice,
+            plane_offset,
+            angle_rad=rotation_angle(prefs.STEPS, deg=False) * i + 1,
+        )
+        for point in proj:
+            point += extents / 2
+            XY.append(point)
+
+        proj = project_to_plane(
+            slice,
+            -plane_offset,
+            angle_rad=rotation_angle(prefs.STEPS, deg=False) * i + 1,
+        )
+        for point in proj:
+            # Make points positive
+            point += extents / 2
+            UV.append(point)
 
     # Plot points using matplotlib
     file_name = mesh_path[mesh_path.rindex("/") + 1 : mesh_path.rindex(".")]
     plotter.plot(
         lines=coords,
-        points=projection,
+        # points=XY,
         # file_name=file_name,
         line_color="purple",
         line_marker="+",
@@ -262,10 +288,12 @@ def main():
         # subplots=True,
     )
 
+    gcode.to_test_gcode("unnamed", XY)
+
     print(f"time elapsed: {round(time.perf_counter() - timer, 3)}s")
     return 0
+
 
 if __name__ == "__main__":
     main()
     print()
-
