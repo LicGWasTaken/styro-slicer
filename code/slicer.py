@@ -44,7 +44,7 @@ def check_arguments():
     return 0
 
 
-def sort_segments(in_slice):
+def sort_segments(in_slice: list):
     """Sort segments to form a closed loop"""
     out_slice = []
     d = {}
@@ -73,7 +73,7 @@ def sort_segments(in_slice):
     return out_slice
 
 
-def redefine_segments(in_slice):
+def redefine_segments(in_slice: list):
     """ignore obsolete points"""
     out_slice = []
 
@@ -117,7 +117,7 @@ def decimate(resolution):
     pass
 
 
-def rotation_angle(steps, deg):
+def rotation_angle(steps: int, deg: float):
     if steps == 0:
         return 0
     elif not deg:
@@ -126,7 +126,9 @@ def rotation_angle(steps, deg):
         return np.pi / steps * 180 / np.pi
 
 
-def slice_mesh_axisymmetric(mesh, steps, get_plane_normals):
+def slice_mesh_axisymmetric(
+    mesh: trimesh.base.Trimesh, steps: int, get_plane_normals: bool
+):
     angle = rotation_angle(steps, deg=False)
 
     # Initialize required values
@@ -161,10 +163,9 @@ def slice_mesh_axisymmetric(mesh, steps, get_plane_normals):
     return out_slices
 
 
-def get_normals(mesh, in_coords):
+def get_normals(mesh: trimesh.base.Trimesh, in_coords: list):
     out_normals = []
     vert_normals = mesh.vertex_normals
-
     for i in range(len(in_coords)):
         idxs = mesh.kdtree.query(in_coords[i][0].to_list(), k=2)[1]
         v = (vert_normals[idxs[0]] + vert_normals[idxs[1]]) / 2
@@ -174,9 +175,10 @@ def get_normals(mesh, in_coords):
     return out_normals
 
 
-def project_to_plane(in_slice, plane_offset, angle_rad):
+def project_to_plane(in_slice: list, plane_offset: float, angle_rad: float):
     """Sadly, trimesh.points.project_to_plane seems to be faulty
     Therefore, I'm forced to implement it myself T-T"""
+
     plane_normal = Vector3(0, 1, 0).normalized().to_np_array()
     coords = [segment[0].rotate_z(-angle_rad).to_list() for segment in in_slice]
     distances = trimesh.points.point_plane_distance(
@@ -184,14 +186,12 @@ def project_to_plane(in_slice, plane_offset, angle_rad):
     )
     coords = [point - plane_normal * distances[i] for i, point in enumerate(coords)]
 
+    # TODO make projections follow normal vector
+    x = trimesh.intersections.plane_lines(
+        [0, 0, 0], [0, 0, 1], [[0, -1, -1], [1, 2, 2]]
+    )
+
     return coords
-
-
-def detect_collisions(mesh, in_coords):
-    for segment in in_coords:
-        intersector = trimesh.ray.ray_pyembree.RayMeshIntersector(mesh)
-        # intersector.intersects_location() TODO needs vector normals to work - does it though?
-    return
 
 
 def main():

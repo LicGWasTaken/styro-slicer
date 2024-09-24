@@ -2,7 +2,6 @@ import numpy as np
 
 
 class Vector3:
-
     def __init__(self, *args):
         self.decimals = (
             2  # Keep this relatively low, the slicing isn't the most accurate

@@ -1,9 +1,8 @@
 import preferences as prefs
 from vector import Vector3
-import plotter
 
 
-def to_gcode(file_name, XY, UV):
+def to_gcode(file_name: str, XY: list, UV: list):
     # Open the output in write mode
     file = open(prefs.OUTPUT_FOLDER_PATH + file_name + ".gcode", mode="w")
     file.write("%\n")  # Start of file
@@ -24,19 +23,19 @@ def to_gcode(file_name, XY, UV):
     return 0
 
 
-def to_test_gcode(file_name, XY):
+def to_test_gcode(file_name: str, Vs: list):
     # Define printer boundaries
     boundaries = [300, 300, 400]
 
     # Scale down the coordinates TODO: this doesn't assure that the x and y coordinates are below 300
     maximum = 0
-    for xy in XY:
-        if max(xy) > maximum:
-            maximum = max(xy)
+    for v in Vs:
+        if max(v) > maximum:
+            maximum = max(v)
 
     mult = max(boundaries) / maximum
-    for i in range(len(XY)):
-        XY[i] = (Vector3(XY[i]) * mult).to_list()
+    for i in range(len(Vs)):
+        Vs[i] = (Vector3(Vs[i]) * mult).to_list()
 
     # Open the output in write mode
     file = open(prefs.OUTPUT_FOLDER_PATH + file_name + ".gcode", mode="w")
@@ -45,9 +44,9 @@ def to_test_gcode(file_name, XY):
     file.write("M302 S0\n")  # Always allow extrusion
     file.write("\n")
 
-    for xy in XY:
-        xy = [round(xy[0], 1), round(xy[2], 1)]
-        s = f"G1 X{xy[1]} Y{xy[1]} Z{xy[0]}\n"  # Machine z is software x
+    for v in Vs:
+        v = [round(v[0], 1), round(v[2], 1)]
+        s = f"G1 X{v[1]} Y{v[1]} Z{v[0]}\n"  # Machine z is software x
         file.write(s)
 
     file.write("M18\n")  # Stepper off
