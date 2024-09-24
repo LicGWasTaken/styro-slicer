@@ -45,8 +45,7 @@ def check_arguments():
 def sort_segments(in_slice: list):
     """Sort segments to form a closed loop"""
     if not h.is_structured(in_slice, "(n, 2)"):
-        h.print_error("list has an incorrect structure")
-        return 1
+        raise ValueError("list not structured correctly")
 
     out_slice = []
     d = {}
@@ -77,7 +76,7 @@ def sort_segments(in_slice: list):
 def redefine_segments(in_slice: list):
     """ignore obsolete points"""
     if not h.is_structured(in_slice, "(n, 2)"):
-        h.print_error("list has an incorrect structure")
+        raise ValueError("list not structured correctly")
         return 1
     
     out_slice = []
@@ -165,7 +164,7 @@ def slice_mesh_axisymmetric(
 
 def get_normals(mesh: trimesh.base.Trimesh, in_coords: list):
     if not h.is_structured(in_coords, "(n, 2)"):
-        h.print_error("list has an incorrect structure")
+        raise ValueError("list not structured correctly")
         return 1
     
     out_normals = []
@@ -182,7 +181,7 @@ def project_to_plane(in_slice: list, plane_offset: float, angle_rad: float):
     """Sadly, trimesh.points.project_to_plane seems to be faulty
     Therefore, I'm forced to implement it myself T-T"""
     if not h.is_structured(in_slice, "(n, 2)"):
-        h.print_error("list has an incorrect structure")
+        raise ValueError("list not structured correctly")
         return 1
     
     plane_normal = Vector3(0, 1, 0).normalized().to_np_array()

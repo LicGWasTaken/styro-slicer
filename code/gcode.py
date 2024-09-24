@@ -4,7 +4,7 @@ import helpers as h
 
 def to_gcode(file_name: str, XY: list, UV: list):
     if not h.is_structured(XY, "(n, 3)") or not h.is_structured(UV, "(n, 3)"):
-        h.print_error("list has an incorrect structure")
+        raise ValueError("list not structured correctly")
         return 1
     
     # Open the output in write mode
@@ -28,7 +28,7 @@ def to_gcode(file_name: str, XY: list, UV: list):
 
 def to_test_gcode(file_name: str, Vs: list):
     if not h.is_structured(Vs, "(n, 3)"):
-        h.print_error("list has an incorrect structure")
+        raise ValueError("list not structured correctly")
         return 1
     
     # Define printer boundaries

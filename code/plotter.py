@@ -6,7 +6,7 @@ from vector import Vector3
 
 def _plot_lines(ax: Axes3D, lines: list, color: str, marker: str):
     if not h.is_structured(lines, "(n, 2)"):
-        h.print_error("list has an incorrect structure")
+        raise ValueError("list not structured correctly")
         return 1
     
     for l in lines:
@@ -27,7 +27,7 @@ def _plot_lines(ax: Axes3D, lines: list, color: str, marker: str):
 
 def _plot_points(ax: Axes3D, points: list, color: str, marker: str):
     if not h.is_structured(points, "(n, 3)"):
-        h.print_error("list has an incorrect structure")
+        raise ValueError("list not structured correctly")
         return 1
     
     for p in points:
