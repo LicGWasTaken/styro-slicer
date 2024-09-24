@@ -10,7 +10,6 @@ import plotter
 import preferences as prefs
 import gcode
 
-
 def check_arguments():
     print("checking command line arguments...")
 
@@ -43,9 +42,12 @@ def check_arguments():
             return 2
     return 0
 
-
 def sort_segments(in_slice: list):
     """Sort segments to form a closed loop"""
+    if not h.is_structured(in_slice, "(n, 2)"):
+        h.print_error("list has an incorrect structure")
+        return 1
+
     out_slice = []
     d = {}
     for segment in in_slice:
@@ -72,9 +74,12 @@ def sort_segments(in_slice: list):
 
     return out_slice
 
-
 def redefine_segments(in_slice: list):
     """ignore obsolete points"""
+    if not h.is_structured(in_slice, "(n, 2)"):
+        h.print_error("list has an incorrect structure")
+        return 1
+    
     out_slice = []
 
     # Make sure the input is sorted
@@ -108,14 +113,11 @@ def redefine_segments(in_slice: list):
 
     return out_slice
 
-
 def subdivide(resolution):
     pass
 
-
 def decimate(resolution):
     pass
-
 
 def rotation_angle(steps: int, deg: float):
     if steps == 0:
@@ -124,7 +126,6 @@ def rotation_angle(steps: int, deg: float):
         return np.pi / steps
     else:
         return np.pi / steps * 180 / np.pi
-
 
 def slice_mesh_axisymmetric(
     mesh: trimesh.base.Trimesh, steps: int, get_plane_normals: bool
@@ -162,8 +163,11 @@ def slice_mesh_axisymmetric(
         return out_slices, out_plane_normals
     return out_slices
 
-
 def get_normals(mesh: trimesh.base.Trimesh, in_coords: list):
+    if not h.is_structured(in_coords, "(n, 2)"):
+        h.print_error("list has an incorrect structure")
+        return 1
+    
     out_normals = []
     vert_normals = mesh.vertex_normals
     for i in range(len(in_coords)):
@@ -174,11 +178,13 @@ def get_normals(mesh: trimesh.base.Trimesh, in_coords: list):
 
     return out_normals
 
-
 def project_to_plane(in_slice: list, plane_offset: float, angle_rad: float):
     """Sadly, trimesh.points.project_to_plane seems to be faulty
     Therefore, I'm forced to implement it myself T-T"""
-
+    if not h.is_structured(in_slice, "(n, 2)"):
+        h.print_error("list has an incorrect structure")
+        return 1
+    
     plane_normal = Vector3(0, 1, 0).normalized().to_np_array()
     coords = [segment[0].rotate_z(-angle_rad).to_list() for segment in in_slice]
     distances = trimesh.points.point_plane_distance(
@@ -192,7 +198,6 @@ def project_to_plane(in_slice: list, plane_offset: float, angle_rad: float):
     )
 
     return coords
-
 
 def main():
     timer = time.perf_counter()
@@ -255,6 +260,8 @@ def main():
         for segment in slice:
             coords.append(segment)
 
+        normals = get_normals(mesh, coords)
+
         plane_offset = sorted(extents)[1] / 2
         proj = project_to_plane(
             slice,
@@ -293,7 +300,7 @@ def main():
     print(f"time elapsed: {round(time.perf_counter() - timer, 3)}s")
     return 0
 
-
 if __name__ == "__main__":
     main()
     print()
+

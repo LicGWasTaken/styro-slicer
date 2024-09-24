@@ -1,8 +1,12 @@
 import preferences as prefs
 from vector import Vector3
-
+import helpers as h
 
 def to_gcode(file_name: str, XY: list, UV: list):
+    if not h.is_structured(XY, "(n, 3)") or not h.is_structured(UV, "(n, 3)"):
+        h.print_error("list has an incorrect structure")
+        return 1
+    
     # Open the output in write mode
     file = open(prefs.OUTPUT_FOLDER_PATH + file_name + ".gcode", mode="w")
     file.write("%\n")  # Start of file
@@ -22,8 +26,11 @@ def to_gcode(file_name: str, XY: list, UV: list):
 
     return 0
 
-
 def to_test_gcode(file_name: str, Vs: list):
+    if not h.is_structured(Vs, "(n, 3)"):
+        h.print_error("list has an incorrect structure")
+        return 1
+    
     # Define printer boundaries
     boundaries = [300, 300, 400]
 
@@ -56,3 +63,4 @@ def to_test_gcode(file_name: str, Vs: list):
     file.close()
 
     return 0
+

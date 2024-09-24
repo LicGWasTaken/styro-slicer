@@ -4,8 +4,11 @@ import numpy as np
 import helpers as h
 from vector import Vector3
 
-
 def _plot_lines(ax: Axes3D, lines: list, color: str, marker: str):
+    if not h.is_structured(lines, "(n, 2)"):
+        h.print_error("list has an incorrect structure")
+        return 1
+    
     for l in lines:
         v0 = l[0]
         v1 = l[1]
@@ -22,11 +25,13 @@ def _plot_lines(ax: Axes3D, lines: list, color: str, marker: str):
                 marker=marker,
             )
 
-
 def _plot_points(ax: Axes3D, points: list, color: str, marker: str):
+    if not h.is_structured(points, "(n, 3)"):
+        h.print_error("list has an incorrect structure")
+        return 1
+    
     for p in points:
         ax.plot(p[0], p[1], p[2], color=color, marker=marker)
-
 
 def plot(**kwargs):
     # Check for proper usage
@@ -106,3 +111,4 @@ def plot(**kwargs):
         return 0
     h.print_error("plotter has no valid points or lines")
     return 1
+
