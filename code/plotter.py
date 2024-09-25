@@ -7,8 +7,7 @@ from vector import Vector3
 def _plot_lines(ax: Axes3D, lines: list, color: str, marker: str):
     if not h.is_structured(lines, "(n, 2)"):
         raise ValueError("list not structured correctly")
-        return 1
-    
+
     for l in lines:
         v0 = l[0]
         v1 = l[1]
@@ -28,10 +27,9 @@ def _plot_lines(ax: Axes3D, lines: list, color: str, marker: str):
 def _plot_points(ax: Axes3D, points: list, color: str, marker: str):
     if not h.is_structured(points, "(n, 3)"):
         raise ValueError("list not structured correctly")
-        return 1
-    
+
     for p in points:
-        ax.plot(p[0], p[1], p[2], color=color, marker=marker)
+        ax.plot(p.x, p.y, p.z, color=color, marker=marker)
 
 def plot(**kwargs):
     # Check for proper usage
@@ -99,9 +97,9 @@ def plot(**kwargs):
                 ax.set_zlabel("Z")
 
             # Remove tick labels
-            ax.set_xticklabels([])
-            ax.set_yticklabels([])
-            ax.set_zticklabels([])
+            # ax.set_xticklabels([])
+            # ax.set_yticklabels([])
+            # ax.set_zticklabels([])
 
             ax.grid(False)
             ax.axis("scaled")

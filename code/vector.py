@@ -1,6 +1,5 @@
 import numpy as np
 
-
 class Vector3:
     def __init__(self, *args):
         self.decimals = (
@@ -86,6 +85,10 @@ class Vector3:
 
     def __rtruediv__(self, other):
         return Vector3(other / self.x, other / self.y, other / self.z)
+    
+    # Python functions
+    def __abs__(self):
+        return Vector3(abs(self.x), abs(self.y), abs(self.z))
 
     # Functions
     def to_list(self):
@@ -93,6 +96,9 @@ class Vector3:
 
     def to_np_array(self):
         return np.array([self.x, self.y, self.z])
+    
+    def max(self):
+            return max(self.to_list())
 
     def magnitude(self):
         # return np.linalg.norm(vector)
@@ -113,3 +119,4 @@ class Vector3:
 
     def zero():
         return Vector3(0, 0, 0)
+

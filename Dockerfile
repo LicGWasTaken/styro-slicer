@@ -19,5 +19,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Optionally, run a script or start a shell
 # CMD ["python", "test_pymesh.py"]
-CMD ["/bin/bash"]
+# CMD ["/bin/bash"]
+CMD ["bash", "-c", "cd /workspace/code && exec /bin/bash"]
 

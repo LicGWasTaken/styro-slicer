@@ -78,7 +78,7 @@ def redefine_segments(in_slice: list):
     if not h.is_structured(in_slice, "(n, 2)"):
         raise ValueError("list not structured correctly")
         return 1
-    
+
     out_slice = []
 
     # Make sure the input is sorted
@@ -108,7 +108,6 @@ def redefine_segments(in_slice: list):
         out_slice.append([prev_segment[0], segment[1]])
     else:
         out_slice.append(prev_segment)
-        # out_slice.append(segment)
 
     return out_slice
 
@@ -126,23 +125,18 @@ def rotation_angle(steps: int, deg: float):
     else:
         return np.pi / steps * 180 / np.pi
 
-def slice_mesh_axisymmetric(
-    mesh: trimesh.base.Trimesh, steps: int, get_plane_normals: bool
-):
+def slice_mesh_axisymmetric(mesh: trimesh.base.Trimesh, steps: int):
     angle = rotation_angle(steps, deg=False)
 
     # Initialize required values
     out_coords = []
     out_slices = []
-    out_plane_normals = []
     plane_normal = Vector3(0, 1, 0)
     plane_origin = Vector3(0, 0, 0)
 
     # Slice the mesh
     for i in range(steps):
         plane_normal = plane_normal.rotate_z(angle)
-        if get_plane_normals:
-            out_plane_normals.append(plane_normal)
         slice = trimesh.intersections.mesh_plane(
             mesh, plane_normal.to_list(), plane_origin.to_list()
         )
@@ -158,15 +152,13 @@ def slice_mesh_axisymmetric(
     # Print results
     h.print_bp(f"generated {np.size(out_coords)} points")
 
-    if get_plane_normals:
-        return out_slices, out_plane_normals
     return out_slices
 
 def get_normals(mesh: trimesh.base.Trimesh, in_coords: list):
     if not h.is_structured(in_coords, "(n, 2)"):
         raise ValueError("list not structured correctly")
         return 1
-    
+
     out_normals = []
     vert_normals = mesh.vertex_normals
     for i in range(len(in_coords)):
@@ -182,21 +174,46 @@ def project_to_plane(in_slice: list, plane_offset: float, angle_rad: float):
     Therefore, I'm forced to implement it myself T-T"""
     if not h.is_structured(in_slice, "(n, 2)"):
         raise ValueError("list not structured correctly")
-        return 1
-    
+
     plane_normal = Vector3(0, 1, 0).normalized().to_np_array()
     coords = [segment[0].rotate_z(-angle_rad).to_list() for segment in in_slice]
     distances = trimesh.points.point_plane_distance(
         coords, plane_normal, [0, plane_offset, 0]
     )
-    coords = [point - plane_normal * distances[i] for i, point in enumerate(coords)]
+    coords = [
+        Vector3(point - plane_normal * distances[i]) for i, point in enumerate(coords)
+    ]
 
     # TODO make projections follow normal vector
     x = trimesh.intersections.plane_lines(
         [0, 0, 0], [0, 0, 1], [[0, -1, -1], [1, 2, 2]]
     )
-
     return coords
+
+def scale_to_size(in_slice: list, bounds: Vector3, extents: Vector3):
+    """Scale points down to fit within the boundaries"""
+    if not h.is_structured(in_slice, "(n, 2)"):
+        raise ValueError("list not structured correctly")
+    
+    out_slice = []
+
+    # TODO: add an option to do this as an argument that automatically takes the smallest given block size
+
+    # max_coords = Vector3.zero()
+    # for l in in_slice:
+    #     max_coords.x = max(max_coords.x, l[0].x, l[1].x)
+    #     max_coords.y = max(max_coords.y, l[0].y, l[1].y)
+    #     max_coords.z = max(max_coords.z, l[0].z, l[1].z)
+    
+    # Scale down the coordinates
+    if all(extent < bound for extent, bound in zip(extents.to_list(), bounds.to_list())):
+        return in_slice
+
+    f = 1 / (extents / 2 / bounds).max()
+    for l in in_slice:
+        out_slice.append([l[0] * f, l[1] * f])
+
+    return out_slice
 
 def main():
     timer = time.perf_counter()
@@ -235,12 +252,13 @@ def main():
             break
     else:
         h.print_error("mesh does not fit within available material sizes")
+        h.print_bp(f"extents: {extents.tolist()}")
         # return 3
 
     # Center mesh to world origin
     mesh.apply_transform(to_origin)
 
-    # Align longest extent to z axis
+    # Align longest extent to z axis TODO: also align the second axis
     extents = np.rint(extents) + prefs.DEFAULT_OFFSET
     axes = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
     max_extent_idx = np.where(extents == np.max(extents))[0][0]
@@ -248,14 +266,13 @@ def main():
 
     # 'Slice' mesh
     coords = []
-    XY = []
-    UV = []
-    slices, plane_normals = slice_mesh_axisymmetric(
-        mesh, prefs.STEPS, get_plane_normals=True
-    )
+    XYs = []
+    UVs = []
+    slices = slice_mesh_axisymmetric(mesh, prefs.STEPS)
     for i in range(len(slices)):
         slice = slices[i]
         slice = redefine_segments(slice)
+        slice = scale_to_size(slice, Vector3(300, 300, 400), Vector3(extents))
         for segment in slice:
             coords.append(segment)
 
@@ -268,8 +285,7 @@ def main():
             angle_rad=rotation_angle(prefs.STEPS, deg=False) * i + 1,
         )
         for point in proj:
-            point += extents / 2
-            XY.append(point)
+            XYs.append(point)
 
         proj = project_to_plane(
             slice,
@@ -277,15 +293,13 @@ def main():
             angle_rad=rotation_angle(prefs.STEPS, deg=False) * i + 1,
         )
         for point in proj:
-            # Make points positive
-            point += extents / 2
-            UV.append(point)
+            UVs.append(point)
 
     # Plot points using matplotlib
     file_name = mesh_path[mesh_path.rindex("/") + 1 : mesh_path.rindex(".")]
     plotter.plot(
         lines=coords,
-        # points=XY,
+        points=XYs,
         # file_name=file_name,
         line_color="purple",
         line_marker="+",
@@ -294,7 +308,8 @@ def main():
         # subplots=True,
     )
 
-    gcode.to_test_gcode("unnamed", XY)
+    gcode.to_test_gcode("unnamed", XYs)
+    gcode.to_gcode("unnamed", XYs, UVs)
 
     print(f"time elapsed: {round(time.perf_counter() - timer, 3)}s")
     return 0
