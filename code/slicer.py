@@ -175,11 +175,12 @@ def project_to_plane(in_slice: list, plane_offset: float, angle_rad: float):
     if not h.is_structured(in_slice, "(n, 2)"):
         raise ValueError("list not structured correctly")
 
-    plane_normal = Vector3(0, 1, 0).normalized().to_np_array()
+    plane_normal =  Vector3(0, 1, 0).normalized().to_np_array() # TODO allow different normals, requires changes in slice rotation
     coords = [segment[0].rotate_z(-angle_rad).to_list() for segment in in_slice]
     distances = trimesh.points.point_plane_distance(
         coords, plane_normal, [0, plane_offset, 0]
     )
+    # Update to use Vector2s
     coords = [
         Vector3(point - plane_normal * distances[i]) for i, point in enumerate(coords)
     ]
@@ -190,7 +191,7 @@ def project_to_plane(in_slice: list, plane_offset: float, angle_rad: float):
     )
     return coords
 
-def scale_to_size(in_slice: list, bounds: Vector3, extents: Vector3):
+def scale_to_fit(in_slice: list, bounds: Vector3, extents: Vector3):
     """Scale points down to fit within the boundaries"""
     if not h.is_structured(in_slice, "(n, 2)"):
         raise ValueError("list not structured correctly")
@@ -272,9 +273,10 @@ def main():
     for i in range(len(slices)):
         slice = slices[i]
         slice = redefine_segments(slice)
-        slice = scale_to_size(slice, Vector3(300, 300, 400), Vector3(extents))
-        for segment in slice:
-            coords.append(segment)
+        slice = scale_to_fit(slice, Vector3(300, 300, 400), Vector3(extents))
+
+        for line in slice:
+            coords.append(line)
 
         normals = get_normals(mesh, coords)
 
@@ -295,6 +297,11 @@ def main():
         for point in proj:
             UVs.append(point)
 
+        # # Make coordinates positive
+        # for i in range(len(slice)):
+        #     for j in range(2):
+        #         slice[i][j] += abs(h.min_line_values(slice))
+
     # Plot points using matplotlib
     file_name = mesh_path[mesh_path.rindex("/") + 1 : mesh_path.rindex(".")]
     plotter.plot(
@@ -308,7 +315,7 @@ def main():
         # subplots=True,
     )
 
-    gcode.to_test_gcode("unnamed", XYs)
+    gcode.to_test_gcode("test", XYs)
     gcode.to_gcode("unnamed", XYs, UVs)
 
     print(f"time elapsed: {round(time.perf_counter() - timer, 3)}s")

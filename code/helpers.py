@@ -42,3 +42,27 @@ def is_structured(l: list, s: str):
                     return False
     return True
 
+def min_point_values(l: list):
+    """Get lowest xyz values in a list of Vector3s"""
+    if not is_structured(l, "(n, 1)"):
+        raise ValueError("list not structured correctly")
+
+    out = Vector3.zero()
+    for p in l:
+        out.x = min(out.x, p.x)
+        out.y = min(out.y, p.y)
+        out.z = min(out.z, p.z)
+    return out
+
+def min_line_values(l: list):
+    """Get lowest xyz values in a list of pairs of Vector3s"""
+    if not is_structured(l, "(n, 2)"):
+        raise ValueError("list not structured correctly")
+
+    out = Vector3.zero()
+    for line in l:
+        out.x = min(out.x, line[0].x, line[1].x)
+        out.y = min(out.y, line[0].y, line[1].y)
+        out.z = min(out.z, line[0].z, line[1].z)
+    return out
+
