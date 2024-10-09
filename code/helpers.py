@@ -66,3 +66,6 @@ def min_line_values(l: list):
         out.z = min(out.z, line[0].z, line[1].z)
     return out
 
+def cross(v1: Vector3, v2: Vector3):
+    return Vector3(np.cross(v1.to_list(), v2.to_list()))
+

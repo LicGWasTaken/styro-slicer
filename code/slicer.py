@@ -136,7 +136,6 @@ def slice_mesh_axisymmetric(mesh: trimesh.base.Trimesh, steps: int):
 
     # Slice the mesh
     for i in range(steps):
-        plane_normal = plane_normal.rotate_z(angle)
         slice = trimesh.intersections.mesh_plane(
             mesh, plane_normal.to_list(), plane_origin.to_list()
         )
@@ -148,6 +147,8 @@ def slice_mesh_axisymmetric(mesh: trimesh.base.Trimesh, steps: int):
             out_coords.append(v3_segment)
             tmp.append(v3_segment)
         out_slices.append(tmp)
+
+        plane_normal = plane_normal.rotate_z(angle)
 
     # Print results
     h.print_bp(f"generated {np.size(out_coords)} points")
@@ -176,13 +177,15 @@ def project_to_plane(in_slice: list, in_normals: list, plane_offset: float, angl
         raise ValueError("list not structured correctly")
     # TODO: Update to use Vector2s
     # TODO allow different normals, requires changes in slice rotation
+    y_axis = Vector3(0, 1, 0)
+    x_axis = Vector3(1, 0, 0)
 
     out_points = []
     plane_origin = [0, plane_offset, 0]
-    plane_normal =  Vector3(0, 1, 0).normalized().to_np_array() 
+    plane_normal =  y_axis.normalized().to_np_array() 
 
     # ------- OLD --------
-    old_points = [segment[0].rotate_z(-angle_rad).to_list() for segment in in_slice]
+    old_points = [line[0].rotate_z(-angle_rad).to_list() for line in in_slice]
     distances = trimesh.points.point_plane_distance(
         old_points, plane_normal, plane_origin
     )
@@ -192,10 +195,30 @@ def project_to_plane(in_slice: list, in_normals: list, plane_offset: float, angl
     # --------------------
     # TODO make projections follow normal vector
     
-    # x = trimesh.intersections.plane_lines(
-    #     [0, 0, 0], [0, 0, 1], [[0, -1, -1], [1, 2, 2]]
-    # )
+    points = [line[0].rotate_z(-angle_rad) for line in in_slice]
+    normals = [n.rotate_z(-angle_rad) for n in in_normals]
 
+    lines = [[], []]
+    for i, (point, normal) in enumerate(zip(points, normals)):
+        sign = np.sign(plane_offset)
+        dir_v = sign * abs(h.cross(x_axis, normal).normalized())
+        print(f"{dir_v}, {normal}")
+        lines[0].insert(i, point.to_list())
+        lines[1].insert(i, (point + dir_v * 2 * plane_offset).to_list())
+
+    intersections, valid = trimesh.intersections.plane_lines(
+        plane_origin, plane_normal, lines
+    )
+
+    if not all(valid):
+        h.print_error("invalid intersections")
+        print(f"{lines[0]}\n{lines[1]}")
+        print(f"\n{intersections}\n")
+        # return None
+
+    # intersections, valid = trimesh.intersections.plane_lines(
+    #     [0, 0, 0], [0, 1, 0], [[[-1, -1, -1], [-2, -2, -2]], [[-1, 2, -1], [3, 3, 3]]]
+    # )
     return old_points
 
 def scale_to_fit(in_slice: list, bounds: Vector3, extents: Vector3):
@@ -289,27 +312,28 @@ def main():
         angle_rad = rotation_angle(prefs.STEPS, deg=False) * i
         plane_offset = sorted(extents)[1] / 2
 
-        try:
-            proj = project_to_plane(
-                slice,
-                normals,
-                plane_offset,
-                angle_rad
-            )
-            for point in proj:
-                XYs.append(point)
+        # try:
+        proj = project_to_plane(
+            slice,
+            normals,
+            plane_offset,
+            angle_rad
+        )
+        for point in proj:
+            XYs.append(point)
 
-            proj = project_to_plane(
-                slice,
-                normals,
-                -plane_offset,
-                angle_rad
-            )
-            for point in proj:
-                UVs.append(point)
-        except:
-            h.print_error("error projecting points")
-            return 1
+        proj = project_to_plane(
+            slice,
+            normals,
+            -plane_offset,
+            angle_rad
+        )
+        for point in proj:
+            UVs.append(point)
+
+        # except Exception(ValueError):
+        #     h.print_error("projection returned an invalid value")
+        #     return 1
 
         # # Make coordinates positive
         # for i in range(len(slice)):

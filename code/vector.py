@@ -73,14 +73,20 @@ class Vector3:
             return Vector3(self.x * other.x, self.y * other.y, self.z * other.z)
         else:
             return Vector3(np.multiply(self.to_list(), other))
+        
+    def __rmul__(self, other):
+        return self * other
 
     def __truediv__(self, other):
         if isinstance(other, Vector3):
-            x = None if other.x == 0 else self.x / other.x
-            y = None if other.y == 0 else self.y / other.y
-            z = None if other.z == 0 else self.z / other.z
+            x = self.x if other.x == 0 else self.x / other.x
+            y = self.y if other.y == 0 else self.y / other.y
+            z = self.z if other.z == 0 else self.z / other.z
             return Vector3(x, y, z)
         else:
+            if other == 0:
+                print(Exception(ZeroDivisionError))
+                return self
             return Vector3(np.divide(self.to_list(), other))
 
     def __rtruediv__(self, other):
