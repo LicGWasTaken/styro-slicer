@@ -155,18 +155,45 @@ def slice_mesh_axisymmetric(mesh: trimesh.base.Trimesh, steps: int):
 
     return out_slices
 
-def get_normals(mesh: trimesh.base.Trimesh, in_coords: list):
-    if not h.is_structured(in_coords, "(n, 2)"):
+def get_normals(mesh: trimesh.base.Trimesh, in_lines: list):
+    if not h.is_structured(in_lines, "(n, 2)"):
         raise ValueError("list not structured correctly")
-        return 1
 
     out_normals = []
-    vert_normals = mesh.vertex_normals
-    for i in range(len(in_coords)):
-        idxs = mesh.kdtree.query(in_coords[i][0].to_list(), k=2)[1]
-        v = (vert_normals[idxs[0]] + vert_normals[idxs[1]]) / 2
 
-        out_normals.insert(i, Vector3(v))
+    # ------ OLD approximation -------
+    # vert_normals = mesh.vertex_normals
+    # for i in range(len(in_coords)):
+    #     idxs = mesh.kdtree.query(in_lines[i][0].to_list(), k=2)[1]
+    #     v = (vert_normals[idxs[0]] + vert_normals[idxs[1]]) / 2
+    #     out_normals.insert(i, Vector3(v))
+    # --------------------------------
+
+    points = [line[0] for line in in_lines]
+    for i, point in enumerate(points):
+        nearest_point, distance, face_idx = mesh.nearest.on_surface([point.to_list()])
+        vertex_indices = mesh.faces[face_idx]
+        vertices = [Vector3(vertex) for vertex in mesh.vertices[vertex_indices][0]]
+        vertex_normals = [Vector3(normal) for normal in mesh.vertex_normals[vertex_indices][0]]
+        # face_normal = mesh.face_normals[face_idx]
+
+        distances = [None] * 3
+        for i, distance in enumerate(distances):
+            distances[i] = (point - vertices[i]).magnitude()
+        
+        # Skip if the point lies on an existing vertex
+        if any(d == 0 for d in distances):
+            for i, distance in enumerate(distances):
+                if distance == 0:
+                    normal = vertex_normals[i]
+            out_normals.append(normal)
+            continue
+        
+        # Ignore furthest point since everys coordinate lies on an edge
+        idxs = [i for i, d in enumerate(distances) if d != max(distances)]
+        normalized_weights = [1 / d / sum(1 / distances[i] for i in idxs) for d in distances]
+        n = vertex_normals[idxs[0]] * normalized_weights[idxs[0]] + vertex_normals[idxs[1]] * normalized_weights[idxs[1]]
+        out_normals.append(n)
 
     return out_normals
 
@@ -201,10 +228,16 @@ def project_to_plane(in_slice: list, in_normals: list, plane_offset: float, angl
     lines = [[], []]
     for i, (point, normal) in enumerate(zip(points, normals)):
         sign = np.sign(plane_offset)
-        dir_v = sign * abs(h.cross(x_axis, normal).normalized())
-        print(f"{dir_v}, {normal}")
+
+        # Prevent the cross product from returning zero
+        if (x_axis == normal):
+            dir_v = Vector3(0, 1, 0)
+        else:
+            dir_v = sign * abs(h.cross(x_axis, normal).normalized())
+            
+        # print(f"{point}, {dir_v}, {normal}, {plane_offset}")
         lines[0].insert(i, point.to_list())
-        lines[1].insert(i, (point + dir_v * 2 * plane_offset).to_list())
+        lines[1].insert(i, (point + dir_v * 2 * abs(plane_offset)).to_list())
 
     intersections, valid = trimesh.intersections.plane_lines(
         plane_origin, plane_normal, lines
@@ -212,8 +245,7 @@ def project_to_plane(in_slice: list, in_normals: list, plane_offset: float, angl
 
     if not all(valid):
         h.print_error("invalid intersections")
-        print(f"{lines[0]}\n{lines[1]}")
-        print(f"\n{intersections}\n")
+        # print(f"{lines[0]}\n{lines[1]}")
         # return None
 
     # intersections, valid = trimesh.intersections.plane_lines(

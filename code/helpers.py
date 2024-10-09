@@ -69,3 +69,11 @@ def min_line_values(l: list):
 def cross(v1: Vector3, v2: Vector3):
     return Vector3(np.cross(v1.to_list(), v2.to_list()))
 
+def area_of_triangle(vertices: list):
+    if not is_structured(vertices, "(3)"):
+        raise ValueError("list not structured correctly")
+    
+    ab = vertices[1] - vertices[0]
+    ac = vertices[2] - vertices[0]
+    return cross(ab, ac).magnitude() / 2
+

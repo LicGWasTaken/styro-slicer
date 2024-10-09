@@ -86,6 +86,7 @@ class Vector3:
         else:
             if other == 0:
                 print(Exception(ZeroDivisionError))
+                breakpoint()
                 return self
             return Vector3(np.divide(self.to_list(), other))
 
