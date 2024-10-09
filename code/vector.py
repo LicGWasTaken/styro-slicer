@@ -101,11 +101,10 @@ class Vector3:
             return max(self.to_list())
 
     def magnitude(self):
-        # return np.linalg.norm(vector)
         return np.sqrt((np.square(self.x) + np.square(self.y) + np.square(self.z)))
 
     def normalized(self):
-        return Vector3(self.to_list() / self.magnitude())
+        return self / self.magnitude()
 
     def rotate_z(self, angle):
         R = np.array(

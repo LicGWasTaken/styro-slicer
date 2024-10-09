@@ -169,27 +169,34 @@ def get_normals(mesh: trimesh.base.Trimesh, in_coords: list):
 
     return out_normals
 
-def project_to_plane(in_slice: list, plane_offset: float, angle_rad: float):
+def project_to_plane(in_slice: list, in_normals: list, plane_offset: float, angle_rad: float):
     """Sadly, trimesh.points.project_to_plane seems to be faulty
     Therefore, I'm forced to implement it myself T-T"""
     if not h.is_structured(in_slice, "(n, 2)"):
         raise ValueError("list not structured correctly")
+    # TODO: Update to use Vector2s
+    # TODO allow different normals, requires changes in slice rotation
 
-    plane_normal =  Vector3(0, 1, 0).normalized().to_np_array() # TODO allow different normals, requires changes in slice rotation
-    coords = [segment[0].rotate_z(-angle_rad).to_list() for segment in in_slice]
+    out_points = []
+    plane_origin = [0, plane_offset, 0]
+    plane_normal =  Vector3(0, 1, 0).normalized().to_np_array() 
+
+    # ------- OLD --------
+    old_points = [segment[0].rotate_z(-angle_rad).to_list() for segment in in_slice]
     distances = trimesh.points.point_plane_distance(
-        coords, plane_normal, [0, plane_offset, 0]
+        old_points, plane_normal, plane_origin
     )
-    # Update to use Vector2s
-    coords = [
-        Vector3(point - plane_normal * distances[i]) for i, point in enumerate(coords)
+    old_points = [
+        Vector3(point - plane_normal * distances[i]) for i, point in enumerate(old_points)
     ]
-
+    # --------------------
     # TODO make projections follow normal vector
-    x = trimesh.intersections.plane_lines(
-        [0, 0, 0], [0, 0, 1], [[0, -1, -1], [1, 2, 2]]
-    )
-    return coords
+    
+    # x = trimesh.intersections.plane_lines(
+    #     [0, 0, 0], [0, 0, 1], [[0, -1, -1], [1, 2, 2]]
+    # )
+
+    return old_points
 
 def scale_to_fit(in_slice: list, bounds: Vector3, extents: Vector3):
     """Scale points down to fit within the boundaries"""
@@ -279,23 +286,30 @@ def main():
             coords.append(line)
 
         normals = get_normals(mesh, coords)
-
+        angle_rad = rotation_angle(prefs.STEPS, deg=False) * i
         plane_offset = sorted(extents)[1] / 2
-        proj = project_to_plane(
-            slice,
-            plane_offset,
-            angle_rad=rotation_angle(prefs.STEPS, deg=False) * i + 1,
-        )
-        for point in proj:
-            XYs.append(point)
 
-        proj = project_to_plane(
-            slice,
-            -plane_offset,
-            angle_rad=rotation_angle(prefs.STEPS, deg=False) * i + 1,
-        )
-        for point in proj:
-            UVs.append(point)
+        try:
+            proj = project_to_plane(
+                slice,
+                normals,
+                plane_offset,
+                angle_rad
+            )
+            for point in proj:
+                XYs.append(point)
+
+            proj = project_to_plane(
+                slice,
+                normals,
+                -plane_offset,
+                angle_rad
+            )
+            for point in proj:
+                UVs.append(point)
+        except:
+            h.print_error("error projecting points")
+            return 1
 
         # # Make coordinates positive
         # for i in range(len(slice)):
