@@ -42,12 +42,13 @@ def check_arguments():
             return 2
     return 0
 
-def sort_segments(in_slice: list):
+def sort_segments(in_slice: list, in_face_slices: list):
     """Sort segments to form a closed loop"""
     if not h.is_structured(in_slice, "(n, 2)"):
         raise ValueError("list not structured correctly")
 
     out_slice = []
+    out_face_slices = []
     d = {}
     for segment in in_slice:
         for v in segment:
@@ -68,10 +69,12 @@ def sort_segments(in_slice: list):
             )
             break
         out_slice.append([key, v])
+        tmp = in_slice.index([key, v]) if [key, v] in in_slice else in_slice.index([v, key])
+        out_face_slices.append(in_face_slices[tmp])
         key = v
         idx = d[key][0] if idx != d[key][0] else d[key][1]
 
-    return out_slice
+    return out_slice, out_face_slices
 
 def redefine_segments(in_slice: list, in_face_indeces: list):
     """ignore obsolete points"""
@@ -82,12 +85,14 @@ def redefine_segments(in_slice: list, in_face_indeces: list):
     out_face_indeces = []
 
     # Make sure the input is sorted
-    in_slice = sort_segments(in_slice)
+    in_slice, in_face_indeces = sort_segments(in_slice, in_face_indeces)
 
     # Delete consecutive straight segments TODO: could possibly be optimized using normal vectors
     prev_segment = in_slice[0]
     prev_v = (prev_segment[1] - prev_segment[0]).normalized()
+    current_face_normal_index = in_face_indeces[0]
     for i in range(len(in_slice))[1:]:
+        # breakpoint()
         segment = in_slice[i]
         v = (segment[1] - segment[0]).normalized()
 
@@ -97,8 +102,10 @@ def redefine_segments(in_slice: list, in_face_indeces: list):
         else:
             if prev_segment not in out_slice and i != 1:
                 out_slice.append(prev_segment)
+                out_face_indeces.append(current_face_normal_index)
                 
             prev_segment = segment
+            current_face_normal_index = in_face_indeces[i]
 
         prev_v = v
 
@@ -109,12 +116,14 @@ def redefine_segments(in_slice: list, in_face_indeces: list):
         out_slice.append([prev_segment[0], segment[1]])
     else:
         out_slice.append(prev_segment)
+    out_face_indeces.append(current_face_normal_index)
 
-    for out_line in out_slice:
-        for i, in_line in enumerate(in_slice):
-            if in_line[1] == out_line[0]:
-                out_face_indeces.append(in_face_indeces[i])
-                break
+    # breakpoint()
+    # for out_line in out_slice:
+    #     for i, in_line in enumerate(in_slice):
+    #         if in_line[1] == out_line[0]:
+    #             out_face_indeces.append(in_face_indeces[i])
+    #             break
 
     # for out_line, out_index in zip(out_slice, out_face_indeces):
     #     print(out_line, out_index)
@@ -163,62 +172,32 @@ def slice_mesh_axisymmetric(mesh: trimesh.base.Trimesh, steps: int):
 
     # Print results
     h.print_bp(f"generated {np.size(out_coords)} points")
-
+    # for i in out_face_indeces:
+    #     for j in i:
+    #         print(j, mesh.vertices[mesh.faces[j]]) 
     return out_slices, out_face_indeces
-
+    
 def get_normals(mesh: trimesh.base.Trimesh, in_lines: list, in_face_indeces: list):
     if not h.is_structured(in_lines, "(n, 2)"):
         raise ValueError("list not structured correctly")
     
     out_normals = []
 
+    # TODO this gets the values from the slicer function. Maybe I can avoid passing it through multiple functions?
     for i, idx in enumerate(in_face_indeces):
         n1 = mesh.face_normals[idx]
+
+        # print(n1, Vector3(n1), Vector3(n1) == Vector3.zero())
+
         if i == len(in_face_indeces) - 1:
             n2 = mesh.face_normals[in_face_indeces[0]]
         else:
             n2 = mesh.face_normals[in_face_indeces[i + 1]]
         
-        normal = (n1 + n2) / 2
-        out_normals.append(Vector3(normal))
-
-    # for i in range(len(in_lines)):
-    #     print(in_lines[i], out_normals[i])
-
-    # ------ OLD approximation -------
-    # vert_normals = mesh.vertex_normals
-    # for i in range(len(in_coords)):
-    #     idxs = mesh.kdtree.query(in_lines[i][0].to_list(), k=2)[1]
-    #     v = (vert_normals[idxs[0]] + vert_normals[idxs[1]]) / 2
-    #     out_normals.insert(i, Vector3(v))
-    # --------------------------------
-    # ------ OLD 2.0 -----------------
-    # points = [line[0] for line in in_lines]
-    # for i, point in enumerate(points):
-    #     nearest_point, distance, face_idx = mesh.nearest.on_surface([point.to_list()])
-    #     vertex_indices = mesh.faces[face_idx]
-    #     vertices = [Vector3(vertex) for vertex in mesh.vertices[vertex_indices][0]]
-    #     vertex_normals = [Vector3(normal) for normal in mesh.vertex_normals[vertex_indices][0]]
-    #     # face_normal = mesh.face_normals[face_idx]
-
-    #     distances = [None] * 3
-    #     for i, distance in enumerate(distances):
-    #         distances[i] = (point - vertices[i]).magnitude()
-        
-    #     # Skip if the point lies on an existing vertex
-    #     if any(d == 0 for d in distances):
-    #         for i, distance in enumerate(distances):
-    #             if distance == 0:
-    #                 normal = vertex_normals[i]
-    #         out_normals.append(normal)
-    #         continue
-        
-    #     # Ignore furthest point since everys coordinate lies on an edge
-    #     idxs = [i for i, d in enumerate(distances) if d != max(distances)]
-    #     normalized_weights = [1 / d / sum(1 / distances[i] for i in idxs) for d in distances]
-    #     n = vertex_normals[idxs[0]] * normalized_weights[idxs[0]] + vertex_normals[idxs[1]] * normalized_weights[idxs[1]]
-    #     out_normals.append(n)
-    # -------------------------
+        # if i == 0:
+        #     print(Vector3(n1), Vector3(n2), "/", in_face_indeces[i], in_face_indeces[i + 1])
+        normal = ((Vector3(n1) + Vector3(n2)) / 2).normalized()
+        out_normals.append(normal)
 
     return out_normals
 
@@ -228,9 +207,8 @@ def project_to_plane(in_slice: list, in_normals: list, plane_offset: float, angl
     if not h.is_structured(in_slice, "(n, 2)"):
         raise ValueError("list not structured correctly")
     # TODO: Update to use Vector2s
-    # TODO allow different normals, requires changes in slice rotation
     y_axis = Vector3(0, 1, 0)
-    x_axis = Vector3(1, 0, 0)
+    x_axis = Vector3(1, 0, 0) 
 
     out_points = []
     plane_origin = [0, plane_offset, 0]
@@ -246,36 +224,34 @@ def project_to_plane(in_slice: list, in_normals: list, plane_offset: float, angl
     ]
     # --------------------
     # # TODO make projections follow normal vector
-    
-    points = [line[0].rotate_z(-angle_rad) for line in in_slice]
-    normals = [n.rotate_z(-angle_rad) for n in in_normals]
+    points = [line[0].rotate_z(-angle_rad).normalized() for line in in_slice]
+    normals = [n.rotate_z(-angle_rad).normalized() for n in in_normals]
 
-    # lines = [[], []]
-    # for i, (point, normal) in enumerate(zip(points, normals)):
-    #     sign = np.sign(plane_offset)
+    lines = [[], []]
+    for i, (point, normal) in enumerate(zip(points, normals)):
+        sign = np.sign(plane_offset)
 
-    #     # Prevent the cross product from returning zero
-    #     if (x_axis == normal):
-    #         dir_v = Vector3(0, 1, 0)
-    #     else:
-    #         dir_v = sign * abs(h.cross(x_axis, normal).normalized())
+        # Prevent the cross product from returning zero
+        if (x_axis == normal):
+            dir_v = Vector3(0, 1, 0)
+        else:
+            dir_v = sign * abs(h.cross(x_axis, normal).normalized())
             
-    #     # print(f"{point}, {dir_v}, {normal}, {plane_offset}")
-    #     lines[0].insert(i, point.to_list())
-    #     lines[1].insert(i, (point + dir_v * 2 * abs(plane_offset)).to_list())
+        lines[0].insert(i, point.to_list())
+        lines[1].insert(i, (point + dir_v * 2 * abs(plane_offset)).to_list())
 
-    # intersections, valid = trimesh.intersections.plane_lines(
-    #     plane_origin, plane_normal, lines
-    # )
+    intersections, valid = trimesh.intersections.plane_lines(
+        plane_origin, plane_normal, lines
+    )
 
-    # if not all(valid):
-    #     h.print_error("invalid intersections")
-    #     # print(f"{lines[0]}\n{lines[1]}")
-    #     # return None
-
-    # intersections, valid = trimesh.intersections.plane_lines(
-    #     [0, 0, 0], [0, 1, 0], [[[-1, -1, -1], [-2, -2, -2]], [[-1, 2, -1], [3, 3, 3]]]
-    # )
+    if not all(valid):
+        h.print_error("invalid intersections")
+        error_indeces = []
+        for i in range(len(valid)):
+            if not valid[i]:
+                error_indeces.append(i)
+        # return None
+        
     return old_points
 
 def scale_to_fit(in_slice: list, bounds: Vector3, extents: Vector3):

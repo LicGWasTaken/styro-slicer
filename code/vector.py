@@ -6,26 +6,26 @@ class Vector3:
             2  # Keep this relatively low, the slicing isn't the most accurate
         )
         if len(args) == 3:
-            self.x = round(args[0], self.decimals) + 0  # +0 gets rid of -0
-            self.y = round(args[1], self.decimals) + 0
-            self.z = round(args[2], self.decimals) + 0
+            self.x = float(round(args[0], self.decimals) + 0)  # +0 gets rid of -0
+            self.y = float(round(args[1], self.decimals) + 0)
+            self.z = float(round(args[2], self.decimals) + 0)
         elif len(args) == 1:
             if isinstance(args[0], list):
                 arr = args[0]
                 if len(arr) != 3 or isinstance(arr[0], list):
                     raise ValueError("Class Vector3 requires a 1D list of 3 elements")
-                self.x = round(arr[0], self.decimals) + 0
-                self.y = round(arr[1], self.decimals) + 0
-                self.z = round(arr[2], self.decimals) + 0
+                self.x = float(round(arr[0], self.decimals) + 0)
+                self.y = float(round(arr[1], self.decimals) + 0)
+                self.z = float(round(arr[2], self.decimals) + 0)
             elif isinstance(args[0], np.ndarray):
                 np_arr = args[0]
                 if len(np_arr.shape) != 1 or len(np_arr) != 3:
                     raise ValueError(
                         "Class Vector3 requires a 1D np.array of 3 elements"
                     )
-                self.x = round(np_arr[0].item(), self.decimals) + 0
-                self.y = round(np_arr[1].item(), self.decimals) + 0
-                self.z = round(np_arr[2].item(), self.decimals) + 0
+                self.x = float(round(np_arr[0].item(), self.decimals) + 0)
+                self.y = float(round(np_arr[1].item(), self.decimals) + 0)
+                self.z = float(round(np_arr[2].item(), self.decimals) + 0)
             else:
                 raise TypeError("Unsupported type for initialization")
         else:
@@ -38,7 +38,7 @@ class Vector3:
         x = None if self.x == None else round(self.x, decimals) + 0
         y = None if self.y == None else round(self.y, decimals) + 0
         z = None if self.z == None else round(self.z, decimals) + 0
-        return f"({x} | {y} | {z})"
+        return f" ({x}|{y}|{z}) "
 
     # Operator overloads
     def __key(self):
@@ -85,8 +85,8 @@ class Vector3:
             return Vector3(x, y, z)
         else:
             if other == 0:
-                print(Exception(ZeroDivisionError))
-                breakpoint()
+                if self != Vector3.zero():
+                    print(Exception(ZeroDivisionError))
                 return self
             return Vector3(np.divide(self.to_list(), other))
 
@@ -124,5 +124,5 @@ class Vector3:
         return Vector3(np.dot(R, self.to_list()))
 
     def zero():
-        return Vector3(0, 0, 0)
+        return Vector3(0.0, 0.0, 0.0)
 
