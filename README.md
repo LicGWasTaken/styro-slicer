@@ -32,8 +32,8 @@ The chosen material size, passed as an array or as an index of *material-sizes*.
 ***align-part*** - bool - def True  
 Align part to vertical axis.&nbsp;
 
-***scale-to-printer*** - bool - def False
-Scale the part down to fit within the printer boundaries.&nbsp;
+***scale-to-machine*** - bool - def False
+Scale the part down to fit within the machine boundaries.&nbsp;
 
 ***scale-to-material*** - bool - def False
 Scale the part down to fit within the available material sizes. Overrides *scale-to-material*.&nbsp;

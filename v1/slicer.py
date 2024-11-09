@@ -69,7 +69,11 @@ def sort_segments(in_slice: list, in_face_slices: list):
             )
             break
         out_slice.append([key, v])
-        tmp = in_slice.index([key, v]) if [key, v] in in_slice else in_slice.index([v, key])
+        tmp = (
+            in_slice.index([key, v])
+            if [key, v] in in_slice
+            else in_slice.index([v, key])
+        )
         out_face_slices.append(in_face_slices[tmp])
         key = v
         idx = d[key][0] if idx != d[key][0] else d[key][1]
@@ -103,7 +107,7 @@ def redefine_segments(in_slice: list, in_face_indeces: list):
             if prev_segment not in out_slice and i != 1:
                 out_slice.append(prev_segment)
                 out_face_indeces.append(current_face_normal_index)
-                
+
             prev_segment = segment
             current_face_normal_index = in_face_indeces[i]
 
@@ -174,26 +178,25 @@ def slice_mesh_axisymmetric(mesh: trimesh.base.Trimesh, steps: int):
     h.print_bp(f"generated {np.size(out_coords)} points")
     # for i in out_face_indeces:
     #     for j in i:
-    #         print(j, mesh.vertices[mesh.faces[j]]) 
+    #         print(j, mesh.vertices[mesh.faces[j]])
     return out_slices, out_face_indeces
-    
+
 def get_normals(mesh: trimesh.base.Trimesh, in_lines: list, in_face_indeces: list):
     if not h.is_structured(in_lines, "(n, 2)"):
         raise ValueError("list not structured correctly")
-    
+
     out_normals = []
 
-    # TODO this gets the values from the slicer function. Maybe I can avoid passing it through multiple functions?
     for i, idx in enumerate(in_face_indeces):
         n1 = mesh.face_normals[idx]
 
         # print(n1, Vector3(n1), Vector3(n1) == Vector3.zero())
 
-        if i == len(in_face_indeces) - 1:
-            n2 = mesh.face_normals[in_face_indeces[0]]
+        if i == 0:
+            n2 = mesh.face_normals[in_face_indeces[len(in_face_indeces) - 1]]
         else:
-            n2 = mesh.face_normals[in_face_indeces[i + 1]]
-        
+            n2 = mesh.face_normals[in_face_indeces[i - 1]]
+
         # if i == 0:
         #     print(Vector3(n1), Vector3(n2), "/", in_face_indeces[i], in_face_indeces[i + 1])
         normal = ((Vector3(n1) + Vector3(n2)) / 2).normalized()
@@ -201,18 +204,20 @@ def get_normals(mesh: trimesh.base.Trimesh, in_lines: list, in_face_indeces: lis
 
     return out_normals
 
-def project_to_plane(in_slice: list, in_normals: list, plane_offset: float, angle_rad: float):
+def project_to_plane(
+    in_slice: list, in_normals: list, plane_offset: float, angle_rad: float
+):
     """Sadly, trimesh.points.project_to_plane seems to be faulty
     Therefore, I'm forced to implement it myself T-T"""
     if not h.is_structured(in_slice, "(n, 2)"):
         raise ValueError("list not structured correctly")
     # TODO: Update to use Vector2s
     y_axis = Vector3(0, 1, 0)
-    x_axis = Vector3(1, 0, 0) 
+    x_axis = Vector3(1, 0, 0)
 
     out_points = []
     plane_origin = [0, plane_offset, 0]
-    plane_normal =  y_axis.normalized().to_np_array() 
+    plane_normal = y_axis.normalized().to_np_array()
 
     # ------- OLD --------
     old_points = [line[0].rotate_z(-angle_rad).to_list() for line in in_slice]
@@ -220,29 +225,29 @@ def project_to_plane(in_slice: list, in_normals: list, plane_offset: float, angl
         old_points, plane_normal, plane_origin
     )
     old_points = [
-        Vector3(point - plane_normal * distances[i]) for i, point in enumerate(old_points)
+        Vector3(point - plane_normal * distances[i])
+        for i, point in enumerate(old_points)
     ]
     # --------------------
     # # TODO make projections follow normal vector
-    points = [line[0].rotate_z(-angle_rad).normalized() for line in in_slice]
+    points = [line[0].rotate_z(-angle_rad) for line in in_slice]
     normals = [n.rotate_z(-angle_rad).normalized() for n in in_normals]
-
     lines = [[], []]
     for i, (point, normal) in enumerate(zip(points, normals)):
         sign = np.sign(plane_offset)
-
         # Prevent the cross product from returning zero
-        if (x_axis == normal):
+        if x_axis == normal:
             dir_v = Vector3(0, 1, 0)
         else:
             dir_v = sign * abs(h.cross(x_axis, normal).normalized())
-            
+
         lines[0].insert(i, point.to_list())
         lines[1].insert(i, (point + dir_v * 2 * abs(plane_offset)).to_list())
 
     intersections, valid = trimesh.intersections.plane_lines(
         plane_origin, plane_normal, lines
     )
+    out_points = (Vector3(inter) for i, inter in enumerate(intersections))
 
     if not all(valid):
         h.print_error("invalid intersections")
@@ -251,14 +256,14 @@ def project_to_plane(in_slice: list, in_normals: list, plane_offset: float, angl
             if not valid[i]:
                 error_indeces.append(i)
         # return None
-        
-    return old_points
+
+    return out_points
 
 def scale_to_fit(in_slice: list, bounds: Vector3, extents: Vector3):
     """Scale points down to fit within the boundaries"""
     if not h.is_structured(in_slice, "(n, 2)"):
         raise ValueError("list not structured correctly")
-    
+
     out_slice = []
 
     # TODO: add an option to do this as an argument that automatically takes the smallest given block size
@@ -268,9 +273,11 @@ def scale_to_fit(in_slice: list, bounds: Vector3, extents: Vector3):
     #     max_coords.x = max(max_coords.x, l[0].x, l[1].x)
     #     max_coords.y = max(max_coords.y, l[0].y, l[1].y)
     #     max_coords.z = max(max_coords.z, l[0].z, l[1].z)
-    
+
     # Scale down the coordinates
-    if all(extent < bound for extent, bound in zip(extents.to_list(), bounds.to_list())):
+    if all(
+        extent < bound for extent, bound in zip(extents.to_list(), bounds.to_list())
+    ):
         return in_slice
 
     f = 1 / (extents / 2 / bounds).max()
@@ -344,21 +351,11 @@ def main():
         plane_offset = sorted(extents)[1] / 2
 
         # try:
-        proj = project_to_plane(
-            slice,
-            normals,
-            plane_offset,
-            angle_rad
-        )
+        proj = project_to_plane(slice, normals, plane_offset, angle_rad)
         for point in proj:
             XYs.append(point)
 
-        proj = project_to_plane(
-            slice,
-            normals,
-            -plane_offset,
-            angle_rad
-        )
+        proj = project_to_plane(slice, normals, -plane_offset, angle_rad)
         for point in proj:
             UVs.append(point)
 
