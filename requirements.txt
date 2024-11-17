@@ -1,3 +1,6 @@
 trimesh[easy]
 matplotlib
 colorama
+open3d
+numpy
+
