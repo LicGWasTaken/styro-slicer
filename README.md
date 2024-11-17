@@ -4,40 +4,50 @@
 * TODO
 
 # Usage
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus in tellus velit. Ut lobortis, turpis sed viverra pellentesque, eros orci imperdiet diam, a iaculis mauris sem vitae lacus. Vivamus varius bibendum purus, a lobortis nunc dapibus eu. Suspendisse est enim, molestie nec justo in, molestie fringilla felis. Curabitur ornare mauris a nibh cursus, vel elementum ligula imperdiet. Sed egestas lectus eros, a posuere sapien iaculis sit amet. Aliquam pharetra ipsum id lacinia dapibus. Quisque ac ante lorem. Suspendisse fermentum libero urna, at blandit odio mollis eleifend. Aenean sit amet tristique ipsum.
+    python main.py file_path --kwargs "{'argument-1': value, 'argument-2': value, etc.}"
 
-## Additional arguments (\*\*kwargs)
-* Boolean command line arguments can just be inputted as *command-line-argument* instead of *command-line-argument=True*.   
+* ***file_path*** - the path to the file containing the mesh, or the name of the file as long as it is within the *MESH_FOLDER* folder
+* ***kwargs*** - keyword arguments as listed below. Put the name in **''** make sure the value fits the description. 
+
+## Additional arguments (\*\*kwargs)  
 * Arguments marked as *'req'* are mandatory.
-* To save the given arguments as preferences, simply add ***save-as-prefs*** as an additional argument.  
+* To save the given arguments as preferences, simply add ***'save-as-prefs': True*** as an additional argument.
 
-***kerf*** - int
+***kerf*** - float
 offset in mm from the contour of the mesh. Varies with wire width and heat.&nbsp;
 
-***projection-axis*** - array *((3), int)*  
+***projection-axis*** - array *((3), int)*
 plane normal of projection planes. e.g. *'[0, 1, 0]'*, invalid if not one the X, Y, or Z axis.&nbsp;
 
-***velocity*** - float  
+***velocity*** - float
 The cutting speed.&nbsp;
 
 ***material-sizes*** - array *((3,), int)*
 available material size(s). e.g. *'[100, 40, 60], [200, 400, 700]'*.&nbsp;
 
-***autoselect-material-size*** - bool - def True  
-Automatically selects the smallest possible material size.&nbsp;
+***autoselect-material-size*** - bool  
+Automatically select the smallest possible material size.&nbsp;
 
-***selected-material-size*** - array *((3), int)* or int
-The chosen material size, passed as an array or as an index of *material-sizes*. Automatically sets autoselect-material-size to False.&nbsp;
+***selected-material-size*** - array *((3), int)*
+The chosen material size, passed as an array. Automatically sets autoselect-material-size to False.&nbsp;
 
-***align-part*** - bool - def True  
+***align-part*** - bool
 Align part to vertical axis.&nbsp;
 
-***scale-to-machine*** - bool - def False
+***scale-to-machine*** - bool
 Scale the part down to fit within the machine boundaries.&nbsp;
 
-***scale-to-material*** - bool - def False
-Scale the part down to fit within the available material sizes. Overrides *scale-to-material*.&nbsp;
+***scale-to-material*** - bool
+Scale the part down to fit within the available material sizes.&nbsp;
 
-***slice-to-fit*** - bool - def False  
+***slice-to-fit*** - bool
 Weather to generate multiple files with sliced sections of the mesh that fit within the available material sizes.&nbsp;
+
+### Slicing processes (exclusive)
+
+***as-convex-hull*** - bool
+Convert the contour of the mesh to its convex hull. Leads to more accurate and time-efficient results.
+
+***as-projection*** - bool
+Project the mesh to a plane. Faster computationally.
 

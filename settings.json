@@ -1,0 +1,15 @@
+{
+    "kerfs": 0.5,
+    "projection-axis": [0, 1, 0],
+    "velocity": 10,
+    "material-sizes": [[1000, 1000, 2000]],
+    "autoselect-material-size": false,
+    "selected-material-size": null,
+    "align-part": true,
+    "scale-to-machine": false,
+    "scale-to-material": false,
+    "slice-to-fit": false,
+    "as-convex-hull": true,
+    "as-projection": false
+}
+

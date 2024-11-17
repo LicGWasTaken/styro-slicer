@@ -1,8 +1,11 @@
 import argparse
 import ast
+import json
 import os
 import prefs
 import utils as u
+
+# TODO 1: Add the saved settings to the passed argv dictionary
 
 def get_arguments():
     """Get the file name/path and additional kwargs from the user"""
@@ -40,9 +43,17 @@ def get_arguments():
     if not check_kwargs_validity(kwargs):
         u.msg("invalid arguments", "error")
         return 4
+    
+    # Get the file path
+    if os.path.isfile(args.file_):
+        path = args.file_
+    else:
+        path = prefs.MESH_FOLDER + args.file_
+
+    # TODO 1
 
     u.msg(f"{len(kwargs)} keyword arguments passed", "info")
-    return args.file_, kwargs
+    return path, kwargs
 
 def check_file_validity(file_: str):
     u.msg("Checking file path", "process")
@@ -98,6 +109,25 @@ def check_kwargs_validity(kwargs: dict):
             if not u.is_structured(value, type_):
                 u.msg("invalid list structure", "error")
                 return 0
+    
+    # Load settings json in read mode
+    with open(prefs.JSON_FOLDER + "settings.json", "r") as file:
+        settings = json.load(file)
+
+    # Handle argument specific conditions
+    if "projection-axis" in kwargs.keys():
+        valid_values = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+        if kwargs["projection-axis"] not in valid_values:
+            u.msg("invalid projection-axis", "error")
+            return 0
+        
+    if "selected-material-size" in kwargs.keys():
+        if kwargs["selected-material-size"] not in settings["material-sizes"]:
+            u.msg("invalid selected-material-size", "error")
+            return 0
+        
+        if "autoselect-material-size" in kwargs.keys():
+            kwargs["autoselect-material-size"] = False
 
     return 1
 

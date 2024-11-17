@@ -6,12 +6,20 @@ import time
 import trimesh
 import utils as u
 
-args = None
-
 def main(file_, **kwargs):
     u.msg(f"args: {file_}, {kwargs}", "debug")
     u.msg("Running main", "process")
 
+    # Load mesh
+    mesh = trimesh.load_mesh(file_)
+    u.msg(f"loaded mesh at {file_}", "info")
+
+    # Get mesh boundaries
+    to_origin, extents = trimesh.bounds.oriented_bounds(mesh)
+    u.msg(f"mesh extents in mm: {mesh.extents}", "info")
+
+    # Translate it to the origin
+    
     return 0
 
 if __name__ == "__main__":
