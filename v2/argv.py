@@ -5,7 +5,7 @@ import os
 import prefs
 import utils as u
 
-# TODO 1: Add the saved settings to the passed argv dictionary
+# DONE 1: Add the saved settings to the passed argv dictionary
 
 def get_arguments():
     """Get the file name/path and additional kwargs from the user"""
@@ -49,8 +49,15 @@ def get_arguments():
         path = args.file_
     else:
         path = prefs.MESH_FOLDER + args.file_
+ 
+    # Load settings json in read mode
+    with open(prefs.JSON_FOLDER + "settings.json", "r") as file:
+        settings = json.load(file)
 
-    # TODO 1
+    # Add settings to kwargs
+    for key in settings.keys():
+        if key not in kwargs:
+            kwargs[key] = settings[key]
 
     u.msg(f"{len(kwargs)} keyword arguments passed", "info")
     return path, kwargs
@@ -126,8 +133,15 @@ def check_kwargs_validity(kwargs: dict):
             u.msg("invalid selected-material-size", "error")
             return 0
         
-        if "autoselect-material-size" in kwargs.keys():
-            kwargs["autoselect-material-size"] = False
+    if "mesh-alignment" in kwargs.keys():
+        if not ([1, 0, 0] in kwargs["mesh-alignment"]
+            and [0, 1, 0] in kwargs["mesh-alignment"]
+            and [0, 0, 1] in kwargs["mesh-alignment"]):
+            u.msg("invalid mesh-alignment", "error")
+            return 0
+        
+        if "align-part" in kwargs.keys():
+            kwargs["align-part"] = True
 
     return 1
 

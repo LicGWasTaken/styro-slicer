@@ -2,13 +2,15 @@
 MESH_FOLDER = "/workspace/obj/"
 JSON_FOLDER = "/workspace/"
 SUPPORTED_FORMATS = [".stl"]
+NUMPY_DECIMALS = 5
+MOTOR_AXIS = [1, 0, 0]
 
 DEFAULT_SETTINGS = {
     "kerfs": 0.5,
     "projection-axis": [0, 1, 0],
     "velocity": 10,
     "material-sizes": [[1000, 1000, 2000]],
-    "autoselect-material-size": False,
+    "mesh-alignment": None,
     "selected-material-size": None,
     "align-part": True,
     "scale-to-machine": False,
@@ -25,7 +27,7 @@ VALID_ARGVS = {
     "projection-axis": [int, int, int],
     "velocity": float,
     "material-sizes": [[int, int, int]],
-    "autoselect-material-size": bool,
+    "mesh-alignment": [[int, int, int], [int, int, int], [int, int, int]],
     "selected-material-size": [int, int, int],
     "align-part": bool,
     "scale-to-machine": bool,

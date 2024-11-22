@@ -23,13 +23,13 @@ plane normal of projection planes. e.g. *'[0, 1, 0]'*, invalid if not one the X,
 The cutting speed.&nbsp;
 
 ***material-sizes*** - array *((3,), int)*
-available material size(s). e.g. *'[100, 40, 60], [200, 400, 700]'*.&nbsp;
+Available material size(s). e.g. *'[100, 40, 60], [200, 400, 700]'*.&nbsp;
 
-***autoselect-material-size*** - bool  
-Automatically select the smallest possible material size.&nbsp;
+***mesh-alignment*** - array*((3, 3, 3), int)*
+How to align the mesh. Expects an array defining 3 axes e.g. [[1, 0, 0], [0, 0, 1], [0, 1, 0]] that will be aligned with the x,y,z axes respectively. The above example aligns the y axis to the z and viceversa. Sets *align-part* to True
 
 ***selected-material-size*** - array *((3), int)*
-The chosen material size, passed as an array. Automatically sets autoselect-material-size to False.&nbsp;
+The chosen material size, passed as an array. Otherwise selects the smallest possible size automatically.&nbsp;
 
 ***align-part*** - bool
 Align part to vertical axis.&nbsp;
