@@ -15,9 +15,9 @@ COPY requirements.txt /workspace/
 RUN pip install --upgrade pip
 
 # Install dependences
+RUN pip install --no-cache-dir -r requirements.txt
 # Dependeces for open3d
 RUN apt update && apt install -y libgomp1 libx11-6 libgl1
-RUN pip install --no-cache-dir -r requirements.txt
 
 # Optionally, run a script or start a shell
 # CMD ["python", "test_pymesh.py"]
