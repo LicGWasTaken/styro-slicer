@@ -5,6 +5,6 @@ docker run -it --rm -v $(pwd)/v1:/workspace/code -v $(pwd)/obj:/workspace/obj -v
 v2
 docker run -it --rm -v $(pwd)/v2:/workspace/code -v $(pwd)/obj:/workspace/obj trimesh-env
 
-docker buildx prune -f
 docker image prune -f
+docker buildx prune -f
 
