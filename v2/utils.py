@@ -1,6 +1,11 @@
 import colorama
 import numpy as np
 import math
+import prefs
+
+# tmp
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 def msg(str, *argvs):
     if "error" in argvs:
@@ -111,6 +116,16 @@ def minkowski(a: np.array, b: np.array):
             break
         
     return np.asarray(out)
+
+def plot(arr: np.ndarray, color:str = "hotpink"):
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection="3d")
+    try:
+        ax.scatter(arr[:, 0], arr[:, 1], arr[:, 2], color=color)
+    except:
+        ax.scatter(arr[:, 0], arr[:, 1], color=color)
+    plt.savefig(prefs.MESH_FOLDER + "unnamed.png")
+
 # ----------- SDFs -----------
 
 def box_SDF(
@@ -140,9 +155,12 @@ def sphere_SDF(
     return magnitude(point) - radius
 
 def vertical_capsule_SDF(
-    point: np.ndarray, radius: float, height: float
+    origin: np.ndarray, point: np.ndarray, radius: float, height: float
 ):
-    p = point
-    p[1] -= clamp(p[1], 0.0, height)
+    """Total capsule height = height + 2 * radius"""
+    p = point - origin
+    # Move the centerpoint from the bottom to the center of the capsule
+    p[2] += height / 2
+    p[2] -= clamp(p[2], 0.0, height)
     return magnitude(p) - radius
 

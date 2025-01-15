@@ -11,16 +11,14 @@ import time
 import trimesh
 import utils as u
 
-# tmp
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-
 # x forward, y right, z up
 
-PCD_SIZE = 50000 # The total amount of points in the point cloud
-Z_SLICE_COUNT = 100 # The amount of subsections when remeshing along the z axis
-ROTATIONAL_SLICE_COUNT = 4 # The amount of subsections when subdividing rotationally
-SUB_PCD_PRECISION = 1 / 10 # Factor to calculate the bounding box width compared to the total extent
+PCD_SIZE = 50000  # The total amount of points in the point cloud
+Z_SLICE_COUNT = 100  # The amount of subsections when remeshing along the z axis
+ROTATIONAL_SLICE_COUNT = 4  # The amount of subsections when subdividing rotationally
+SUB_PCD_PRECISION = (
+    1 / 100
+)  # Factor to calculate the bounding box width compared to the total extent
 
 def main(file_, **kwargs):
     # Define global variables within main
@@ -178,13 +176,6 @@ def main(file_, **kwargs):
         )
         pcd += sub_pcd
 
-    # # Plot the points
-    # fig = plt.figure()
-    # ax = fig.add_subplot(111, projection="3d")
-    # ax.scatter(pcd_points[:, 0], pcd_points[:, 1], pcd_points[:, 2])
-    # # ax.scatter(pcd_slices[19][:, 0], pcd_slices[19][:, 1], pcd_slices[19][:, 2])
-    # plt.savefig(prefs.MESH_FOLDER + "unnamed.png")
-
     # --------------- Remesh ---------------
     pcd.estimate_normals()
 
@@ -200,9 +191,7 @@ def main(file_, **kwargs):
     # Create the triangular mesh with the vertices and faces from open3d
     v = np.asarray(convex_mesh.vertices)
     t = np.asarray(convex_mesh.triangles)
-    mesh = trimesh.Trimesh(
-        v, t, vertex_normals=np.asarray(convex_mesh.vertex_normals)
-    )
+    mesh = trimesh.Trimesh(v, t, vertex_normals=np.asarray(convex_mesh.vertex_normals))
     trimesh.convex.is_convex(mesh)
     # trimesh.repair.fill_holes(mesh)
     mesh.export(prefs.MESH_FOLDER + "convex_mesh.stl")
@@ -212,6 +201,32 @@ def main(file_, **kwargs):
     convex_pcd = convex_mesh.sample_points_poisson_disk(
         number_of_points=PCD_SIZE, init_factor=5
     )
+
+    # remove top and bottom capsule to not collide with the machine
+    capsule_radius = 50 
+    capsule_height = 30
+    convex_pcd_points = []
+    for i, p in enumerate(convex_pcd.points):
+        if (
+            u.vertical_capsule_SDF(
+                origin=np.asarray([extents[0] / 2, extents[1] / 2, capsule_height / 2]),
+                point=p,
+                radius=capsule_radius,
+                height=capsule_height,
+            )
+            > 0
+            and u.vertical_capsule_SDF(
+                origin=np.asarray(
+                    [extents[0] / 2, extents[1] / 2, extents[2] - (capsule_height / 2)]
+                ),
+                point=p,
+                radius=capsule_radius,
+                height=capsule_height,
+            )
+            > 0
+        ):
+            convex_pcd_points.append(convex_pcd.points[i])
+    convex_pcd_points = np.asarray(convex_pcd_points)
 
     box_x = math.sqrt(extents[0] ** 2 + extents[1] ** 2) / 2
     box_y = min(extents[0], extents[1]) * SUB_PCD_PRECISION
@@ -228,7 +243,7 @@ def main(file_, **kwargs):
 
         # Find points within a slice of the mesh
         contour = []
-        for p in convex_pcd.points:
+        for p in convex_pcd_points:
             if np.isclose(
                 u.box_SDF(
                     origin=box_origin,
@@ -269,17 +284,7 @@ def main(file_, **kwargs):
 
         concave_hulls.append(np.asarray(concave_hull_points))
 
-    # arr = []
-    # for c in concave_hulls:
-    #     for p in c:
-    #         arr.append(p)
-    # arr = np.asarray(arr)
-
-    # # Plot the points
-    # fig = plt.figure()
-    # ax = fig.add_subplot(111, projection="3d")
-    # ax.scatter(arr[:, 0], arr[:, 1], arr[:, 2], color="hotpink")
-    # plt.savefig(prefs.MESH_FOLDER + "unnamed.png")
+    u.plot(concave_hulls[0])
 
     # --------------- Minkowski Sum for kerf ---------------
     circle_quality = 16
@@ -289,16 +294,14 @@ def main(file_, **kwargs):
 
     # for i, concave_hull in enumerate(concave_hulls):
     #     concave_hulls[i] = u.minkowski(concave_hull, circle)
-    a = np.asarray([np.asarray([0, 0]), np.asarray([1, 0]), np.asarray([1, 1]),  np.asarray([0, 1])])
+    a = np.asarray(
+        [np.asarray([0, 0]), np.asarray([1, 0]), np.asarray([1, 1]), np.asarray([0, 1])]
+    )
     minkowski = u.minkowski(a, circle)
 
-    arr = np.asarray(minkowski)
-    # Plot the points
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection="3d")
-    ax.scatter(arr[:, 0], arr[:, 1], color="hotpink")
-    plt.savefig(prefs.MESH_FOLDER + "unnamed.png")
-        
+    # arr = np.asarray(minkowski)
+    # u.plot(arr)
+
     return 0
 
     # for n, concave_hull in enumerate(concave_hulls):
@@ -364,7 +367,7 @@ def main(file_, **kwargs):
     #             break
 
     #         new_contour.append(concave_hull[i])
-        
+
     #     print(len(concave_hull), len(new_contour), min_idx)
     #     concave_hulls[n] = new_contour
 
@@ -382,58 +385,7 @@ def main(file_, **kwargs):
     # # ax.scatter(pcd_slices[19][:, 0], pcd_slices[19][:, 1], pcd_slices[19][:, 2])
     # plt.savefig(prefs.MESH_FOLDER + "unnamed.png")
 
-    # ---------------  ---------------
     return 0
-
-    convex_mesh.compute_vertex_normals()
-    convex_pcd = convex_mesh.sample_points_poisson_disk(
-        number_of_points=PCD_SIZE, init_factor=5
-    )
-
-    # Subdivide points along the x axis
-    Z_SLICE_COUNT = 10
-    x_slices = [[] for _ in range(Z_SLICE_COUNT)]
-    for p in convex_pcd.points:
-        i = math.floor(p[0] / (extents[0] / Z_SLICE_COUNT))
-
-        # points at the end are slightly outside the extents.
-        # To avoid errors we add them to the last slice.
-        if i >= len(x_slices):
-            i = len(x_slices) - 1
-        x_slices[i].append(p)
-
-    # Convert to a np array
-    for i, s in enumerate(x_slices):
-        x_slices[i] = np.asarray(s)
-
-    xs = []
-    for i, s in enumerate(x_slices):
-        avg_x = (i - 0.5) * extents[0] / Z_SLICE_COUNT
-        for p in s:
-            xs.append([avg_x, p[1], p[2]])
-    xs = np.asarray(xs)
-
-    # Plot the points
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection="3d")
-    ax.scatter(xs[:, 0], xs[:, 1], xs[:, 2])
-    plt.savefig(prefs.MESH_FOLDER + "unnamed.png")
-    return 0
-
-    # --------------- 2D convex hulls ---------------
-    # convex_pcd = []
-    # for i, s in enumerate(pcd_slices):
-    #     hull = s[sp.spatial.ConvexHull(s).vertices]
-    #     z = (extents[2] / slice_count) * i
-    #     for p in hull:
-    #         convex_pcd.append(np.asarray([p[0], p[1], z]))
-    # convex_pcd = np.asarray(convex_pcd)
-
-    # # Plot the points
-    # fig = plt.figure()
-    # ax = fig.add_subplot(111, projection="3d")
-    # ax.scatter(convex_pcd[:, 0], convex_pcd[:, 1], convex_pcd[:, 2])
-    # plt.savefig(prefs.MESH_FOLDER + "unnamed.png")
 
 if __name__ == "__main__":
     # Start timer
