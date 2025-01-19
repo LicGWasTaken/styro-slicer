@@ -74,8 +74,7 @@ def polar_angle(v):
     return rad + 2 * math.pi * (rad < 0)
 
 def minkowski(a: np.array, b: np.array):
-    # Sort the points counterclockwise
-    # TODO
+    """Both arrays have to be sorted counterclockwise beginning from the bottom left angle"""
     # Calculate the minkoski sum
     i = 0
     j = 0
@@ -150,9 +149,10 @@ def box_SDF(
     return magnitude(max_p)
 
 def sphere_SDF(
-    point: np.ndarray, radius: float 
+    origin: np.ndarray, point: np.ndarray, radius: float 
 ):
-    return magnitude(point) - radius
+    p = point - origin
+    return magnitude(p) - radius
 
 def vertical_capsule_SDF(
     origin: np.ndarray, point: np.ndarray, radius: float, height: float

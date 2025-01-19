@@ -1,6 +1,7 @@
 # import alphashape
 import argv
 import concave_hull as ch
+# import ctypes
 import math
 import numpy as np
 import open3d as o3d
@@ -29,6 +30,16 @@ def main(file_, **kwargs):
 
     u.msg(f"args: {file_}, {kwargs}", "debug")
     u.msg("Running main", "process")
+
+    # # Load Shared C-Library
+    # lib = ctypes.CDLL(prefs.JSON_FOLDER + 'library.so')
+
+    # # Define function signatures
+    # lib.add.argtypes = [ctypes.c_int, ctypes.c_int]
+    # lib.add.restype = ctypes.c_int
+
+    # # Call the function
+    # lib.my_function()
 
     # Load mesh
     tri_mesh = trimesh.load_mesh(file_)
@@ -179,6 +190,11 @@ def main(file_, **kwargs):
     # --------------- Remesh ---------------
     pcd.estimate_normals()
 
+    # Add kerf to pcd
+    kerf = 10
+    for i, p in enumerate(pcd.points):
+        pcd.points[i] = p + pcd.normals[i] * kerf
+
     # Estimate radius for rolling ball
     distances = pcd.compute_nearest_neighbor_distance()
     avg_dist = np.mean(distances)
@@ -196,6 +212,10 @@ def main(file_, **kwargs):
     # trimesh.repair.fill_holes(mesh)
     mesh.export(prefs.MESH_FOLDER + "convex_mesh.stl")
 
+    # Update mesh extents
+    extents += 2 * kerf
+    convex_mesh.translate([kerf, kerf, kerf])
+
     # --------------- Rotational coordinates  ---------------
     convex_mesh.compute_vertex_normals()
     convex_pcd = convex_mesh.sample_points_poisson_disk(
@@ -203,13 +223,13 @@ def main(file_, **kwargs):
     )
 
     # remove top and bottom capsule to not collide with the machine
-    capsule_radius = 50 
-    capsule_height = 30
+    capsule_radius = u.magnitude([extents[0], extents[1]]) / 20 
+    capsule_height = extents[2] / 50
     convex_pcd_points = []
     for i, p in enumerate(convex_pcd.points):
-        if (
+        if ( 
             u.vertical_capsule_SDF(
-                origin=np.asarray([extents[0] / 2, extents[1] / 2, capsule_height / 2]),
+                origin=np.asarray([extents[0] / 2, extents[1] / 2, 0]),
                 point=p,
                 radius=capsule_radius,
                 height=capsule_height,
@@ -217,7 +237,7 @@ def main(file_, **kwargs):
             > 0
             and u.vertical_capsule_SDF(
                 origin=np.asarray(
-                    [extents[0] / 2, extents[1] / 2, extents[2] - (capsule_height / 2)]
+                    [extents[0] / 2, extents[1] / 2, extents[2]]
                 ),
                 point=p,
                 radius=capsule_radius,
@@ -228,7 +248,7 @@ def main(file_, **kwargs):
             convex_pcd_points.append(convex_pcd.points[i])
     convex_pcd_points = np.asarray(convex_pcd_points)
 
-    box_x = math.sqrt(extents[0] ** 2 + extents[1] ** 2) / 2
+    box_x = u.magnitude([extents[0], extents[1]]) / 2
     box_y = min(extents[0], extents[1]) * SUB_PCD_PRECISION
     box_z = extents[2]
     box_extents = np.asarray([box_x, box_y, box_z])
@@ -239,6 +259,7 @@ def main(file_, **kwargs):
         to_box_center_vector = np.asarray(
             [math.cos(box_rotation), math.sin(box_rotation), 0]
         )
+        to_box_center_vector /= u.magnitude(to_box_center_vector)
         box_origin = extents / 2 + to_box_center_vector * box_x / 2
 
         # Find points within a slice of the mesh
@@ -258,9 +279,8 @@ def main(file_, **kwargs):
 
         # Rotate them along the z axis
         for i, p in enumerate(contour):
-            p -= box_origin
+            p -= (box_origin - to_box_center_vector * box_x / 2) 
             contour[i] = u.rotate_z_rad(p, -box_rotation)
-            # = p + origin
 
         # Calculate their 2d concave hull
         concave_hull_idxs = ch.concave_hull_indexes(
@@ -269,59 +289,148 @@ def main(file_, **kwargs):
             length_threshold=0.0,
         )
         concave_hull_points = contour[:, [0, 2]][concave_hull_idxs]
+        
+        # # Add the y coordinate back as zeros
+        # zeros = np.zeros((concave_hull_points.shape[0],))
+        # concave_hull_points = np.column_stack(
+        #     (concave_hull_points[:, 0], zeros, concave_hull_points[:, 1])
+        # )
+
+        # # Rotate them back to their original position
+        # for i, p in enumerate(concave_hull_points):
+        #     p = u.rotate_z_rad(p, box_rotation)
+        #     concave_hull_points[i] = p + extents / 2# + box_origin
+        
+        # concave_hulls.append(np.asarray(concave_hull_points))
+        # continue
+
+        # Sort the hulls counterclockwise
+        d = [extents[0], extents[0]]
+        min_idx = [0, 0]
+        # top = np.asarray([-extents[0] / 4, extents[2] / 2])
+        # bottom = np.asarray([-extents[0] / 4, -extents[2] / 2])
+        top = np.asarray([0, extents[2] / 2])
+        bottom = np.asarray([0, -extents[2] / 2])
+        for i, p in enumerate(concave_hull_points):
+            # Find points closest to the z axis at the origin
+            tmp = u.magnitude(p - bottom)
+            if tmp < d[0]:
+                d[0] = tmp
+                min_idx[0] = i
+
+            tmp = u.magnitude(p - top)
+            if tmp < d[1]:
+                d[1] = tmp
+                min_idx[1] = i
+
+        # Loop between extrema to sort a list from bottom to top
+        # Compare distances to get the closest neighbor
+        idx = min_idx[0]
+        sorted_hull_indeces = []
+        while True:
+            sorted_hull_indeces.append(idx)
+            
+            if idx == min_idx[1]:
+                break
+            
+            minimum = 100
+            minimum_idx = 0
+            for i, p in enumerate(concave_hull_points):
+                if i == idx:
+                    continue
+
+                distance = u.sphere_SDF(origin=concave_hull_points[idx], point=p, radius=1)
+                if distance < minimum and i not in sorted_hull_indeces:
+                    minimum = distance
+                    minimum_idx = i
+
+            idx = minimum_idx
+
+        sorted_hull = concave_hull_points[sorted_hull_indeces]    
 
         # Add the y coordinate back as zeros
-        zeros = np.zeros((concave_hull_points.shape[0],))
-        concave_hull_points = np.column_stack(
-            (concave_hull_points[:, 0], zeros, concave_hull_points[:, 1])
+        zeros = np.zeros((sorted_hull.shape[0],))
+        sorted_hull = np.column_stack(
+            (sorted_hull[:, 0], zeros, sorted_hull[:, 1])
         )
 
         # Rotate them back to their original position
-        for i, p in enumerate(concave_hull_points):
-            # p -= origin
+        for i, p in enumerate(sorted_hull):
             p = u.rotate_z_rad(p, box_rotation)
-            concave_hull_points[i] = p + box_origin
+            sorted_hull[i] = p + extents / 2 # + box_origin
 
-        concave_hulls.append(np.asarray(concave_hull_points))
+        concave_hulls.append(np.asarray(sorted_hull))
 
-    u.plot(concave_hulls[0])
+    arr = []
+    for x in concave_hulls:
+        for y in x:
+            arr.append(y)
+    arr = np.asarray(arr)
+    u.plot(arr)
+
+    return
 
     # --------------- Minkowski Sum for kerf ---------------
-    circle_quality = 16
-    circle = []
-    for i in range(circle_quality):
-        circle.append(u.rotate_z_rad([0, -0.1], i * 2 * math.pi / circle_quality))
+    # circle_quality = 16
+    # circle = []
+    # for i in range(circle_quality):
+    #     circle.append(u.rotate_z_rad([0, -0.1], i * 2 * math.pi / circle_quality))
 
-    # for i, concave_hull in enumerate(concave_hulls):
-    #     concave_hulls[i] = u.minkowski(concave_hull, circle)
-    a = np.asarray(
-        [np.asarray([0, 0]), np.asarray([1, 0]), np.asarray([1, 1]), np.asarray([0, 1])]
-    )
-    minkowski = u.minkowski(a, circle)
+    # sorted_hulls = []
+    # minkowskis = []
+    # for n, concave_hull in enumerate(concave_hulls):
+        # d = [extents[0], extents[0]]
+        # min_idx = [0, 0]
+        # top = np.asarray([extents[0] / 2, extents[1] / 2, extents[2]])
+        # bottom = np.asarray([extents[0] / 2, extents[1] / 2, 0])
+        # for i, p in enumerate(concave_hull):
+        #     # Find points closest to the z axis at the origin
+        #     tmp = u.magnitude(p - bottom)
+        #     if tmp < d[0]:
+        #         d[0] = tmp
+        #         min_idx[0] = i
 
-    # arr = np.asarray(minkowski)
+        #     tmp = u.magnitude(p - top)
+        #     if tmp < d[1]:
+        #         d[1] = tmp
+        #         min_idx[1] = i
+
+        # # Loop between extrema to sort a list from bottom to top
+        # # Compare distances to get the closest neighbor
+        # idx = min_idx[0]
+        # sorted_hull_indeces = []
+        # while True:
+        #     sorted_hull_indeces.append(idx)
+            
+        #     if idx == min_idx[1]:
+        #         break
+            
+        #     minimum = 100
+        #     minimum_idx = 0
+        #     for i, p in enumerate(concave_hull):
+        #         if i == idx:
+        #             continue
+
+        #         distance = u.sphere_SDF(origin=concave_hull[idx], point=p, radius=1)
+        #         if distance < minimum and i not in sorted_hull_indeces:
+        #             minimum = distance
+        #             minimum_idx = i
+
+        #     idx = minimum_idx
+
+        # sorted_hull_indeces = np.asarray(sorted_hull_indeces)
+        # sorted_hulls.append(concave_hull[sorted_hull_indeces])
+
+        # minkowski = u.minkowski(concave_hull[sorted_hull_indeces], circle)
+        # minkowskis.append(minkowski)
+
+    # arr = []
+    # for x in minkowski:
+    #     for y in x:
+    #         arr.append(y)
+    # arr = np.asarray(arr)
     # u.plot(arr)
 
-    return 0
-
-    # for n, concave_hull in enumerate(concave_hulls):
-    #     d = [extents[0], extents[0]]
-    #     min_idx = [0, 0]
-    #     top = np.asarray([extents[0] / 2, extents[1] / 2, extents[2]])
-    #     bottom = np.asarray([extents[0] / 2, extents[1] / 2, 0])
-    #     for i, p in enumerate(concave_hull):
-    #         # Find points closest to the z axis at the origin
-    #         tmp = u.magnitude(p - top)
-    #         if tmp < d[0]:
-    #             d[0] = tmp
-    #             min_idx[0] = i
-
-    #         tmp = u.magnitude(p - bottom)
-    #         if tmp < d[1]:
-    #             d[1] = tmp
-    #             min_idx[1] = i
-
-    #     # Loop between extrema and remove the side of the hull closest to the centerline
     #     avg_dist = [0, 0]
     #     b = False
     #     count = 0
@@ -370,20 +479,6 @@ def main(file_, **kwargs):
 
     #     print(len(concave_hull), len(new_contour), min_idx)
     #     concave_hulls[n] = new_contour
-
-    # # Plot the points
-    # arr = []
-    # for c in concave_hulls:
-    #     for p in c:
-    #         arr.append(p)
-    # arr = np.asarray(arr)
-
-    # # Plot the points
-    # fig = plt.figure()
-    # ax = fig.add_subplot(111, projection="3d")
-    # ax.scatter(arr[:, 0], arr[:, 1], arr[:, 2], color="black")
-    # # ax.scatter(pcd_slices[19][:, 0], pcd_slices[19][:, 1], pcd_slices[19][:, 2])
-    # plt.savefig(prefs.MESH_FOLDER + "unnamed.png")
 
     return 0
 
