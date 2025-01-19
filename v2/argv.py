@@ -59,7 +59,7 @@ def get_arguments():
         if key not in kwargs:
             kwargs[key] = settings[key]
 
-    u.msg(f"{len(kwargs)} keyword arguments passed", "info")
+    u.msg(f"{len(kwargs)} settings passed", "info")
     return path, kwargs
 
 def check_file_validity(file_: str):

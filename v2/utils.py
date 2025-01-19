@@ -7,17 +7,17 @@ import prefs
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
-def msg(str, *argvs):
-    if "error" in argvs:
-        print(colorama.Style.BRIGHT + colorama.Fore.RED + str)
-    elif "warning" in argvs:
-        print(colorama.Style.NORMAL + colorama.Fore.YELLOW + str)
-    elif "process" in argvs:
-        print(colorama.Style.NORMAL + str + "...")
-    elif "info" in argvs:
-        print(colorama.Style.DIM + "--> " + str)
-    elif "debug" in argvs:
-        print(colorama.Style.BRIGHT + colorama.Fore.LIGHTBLUE_EX + str)
+def msg(str, type="debug", end="\n"):
+    if type == "error":
+        print(colorama.Style.BRIGHT + colorama.Fore.RED + str, end=end)
+    elif type =="warning":
+        print(colorama.Style.NORMAL + colorama.Fore.YELLOW + str, end=end)
+    elif type =="process":
+        print(colorama.Style.NORMAL + str + "...", end=end)
+    elif type =="info":
+        print(colorama.Style.DIM + "--> " + str, end=end)
+    elif type == "debug":
+        print(colorama.Style.BRIGHT + colorama.Fore.LIGHTBLUE_EX + str, end=end)
 
     print(colorama.Style.RESET_ALL, end="")
 
