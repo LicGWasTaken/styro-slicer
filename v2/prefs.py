@@ -1,5 +1,6 @@
 # Backend
 MESH_FOLDER = "/workspace/obj/"
+OUTPUT_FOLDER = "/workspace/output/"
 JSON_FOLDER = "/workspace/"
 SUPPORTED_FORMATS = [".stl"]
 NUMPY_DECIMALS = 5

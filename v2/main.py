@@ -1,6 +1,7 @@
 # import alphashape
 import argv
 import concave_hull as ch
+import gcode
 import math
 import numpy as np
 import open3d as o3d
@@ -15,7 +16,7 @@ import utils as u
 
 PCD_SIZE = 50000  # The total amount of points in the point cloud
 Z_SLICE_COUNT = 100  # The amount of subsections when remeshing along the z axis
-ROTATIONAL_SLICE_COUNT = 32  # The amount of subsections when subdividing rotationally
+ROTATIONAL_SLICE_COUNT = 8  # The amount of subsections when subdividing rotationally
 SUB_PCD_PRECISION = (
     1 / 100
 )  # Factor to calculate the bounding box width compared to the total extent
@@ -336,8 +337,16 @@ def main(file_, **kwargs):
 
         # Rotate them back to their original position
         for i, p in enumerate(sorted_hull):
-            p = u.rotate_z_rad(p, box_rotation)
+            # p = u.rotate_z_rad(p, box_rotation)
             sorted_hull[i] = p + extents / 2
+
+        # Scale it if necessary
+        # TODO add argument
+        machine_extents = [250, 250, 250]
+        for i, p in enumerate(sorted_hull):
+            for j in range(3):
+                p[j] *= machine_extents[j] / extents[j]
+            sorted_hull[i] = p
 
         concave_hulls.append(np.asarray(sorted_hull))
 
@@ -345,6 +354,8 @@ def main(file_, **kwargs):
             u.msg(f"finished {n + 1} sections", "info", "\r")
         else:
             u.msg(f"finished {n + 1} sections", "info")
+
+    gcode.to_gcode("output", concave_hulls, 2 * math.pi / ROTATIONAL_SLICE_COUNT)
 
     arr = []
     for x in concave_hulls:
