@@ -1,7 +1,10 @@
 import colorama
 import numpy as np
 import math
+
+import trimesh.bounds
 import prefs
+import trimesh
 
 # tmp
 import matplotlib.pyplot as plt
@@ -72,6 +75,13 @@ def clamp(n, min, max):
 def polar_angle(v):
     rad = math.atan2(v[1], v[0])
     return rad + 2 * math.pi * (rad < 0)
+
+def axis_oriented_extents(mesh: trimesh.Trimesh):
+    min_, max_ = mesh.bounds
+    extents = max_ - min_
+    to_origin = np.eye(4)
+    to_origin[:3, 3] = -((max_ + min_) / 2)
+    return to_origin, extents
 
 def minkowski(a: np.array, b: np.array):
     """Both arrays have to be sorted counterclockwise beginning from the bottom left angle"""

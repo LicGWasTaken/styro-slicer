@@ -16,7 +16,7 @@ import utils as u
 
 PCD_SIZE = 50000  # The total amount of points in the point cloud
 Z_SLICE_COUNT = 100  # The amount of subsections when remeshing along the z axis
-ROTATIONAL_SLICE_COUNT = 8  # The amount of subsections when subdividing rotationally
+ROTATIONAL_SLICE_COUNT = 16  # The amount of subsections when subdividing rotationally
 SUB_PCD_PRECISION = (
     1 / 100
 )  # Factor to calculate the bounding box width compared to the total extent
@@ -36,7 +36,9 @@ def main(file_, **kwargs):
     u.msg(f"loaded mesh at {file_}", "info")
 
     # Get mesh boundaries
-    to_origin, extents = trimesh.bounds.oriented_bounds(tri_mesh)
+    # Oriented Bounds also rotates the mesh, which isn't helpful in this scenario
+    # to_origin, extents = trimesh.bounds.oriented_bounds(tri_mesh)
+    to_origin, extents = u.axis_oriented_extents(tri_mesh)
     u.msg(f"mesh extents: {tri_mesh.extents}", "info")
 
     # Select the smallest possible material size
@@ -67,7 +69,6 @@ def main(file_, **kwargs):
             if not valid:
                 u.msg("mesh doesn't fit within available sizes", "warning")
 
-    # Center mesh to world origin
     tri_mesh = tri_mesh.apply_transform(to_origin)
 
     # Translate to only have positive vertices
@@ -106,7 +107,7 @@ def main(file_, **kwargs):
         tri_mesh = tri_mesh.apply_transform(rotation_matrix)
 
         # Update extents
-        to_origin, extents = trimesh.bounds.oriented_bounds(tri_mesh)
+        to_origin, extents = u.axis_oriented_extents(tri_mesh)  
 
     # --------------- Slicing ---------------
     u.msg("Computing convex hulls", "process")
@@ -139,7 +140,7 @@ def main(file_, **kwargs):
             )
 
         convex_slices[i] = tmp
-    u.msg("computed convex hull of slices", "info")
+    u.msg("sliced mesh", "info")
 
     # --------------- O3D ---------------
     pcd = o3d.geometry.PointCloud()
@@ -147,11 +148,15 @@ def main(file_, **kwargs):
     # Scale the number of points with the extents to get a more even distribution
     volumes = []
     sum = 0
-    for mesh in convex_slices:
-        to_origin, extents = trimesh.bounds.oriented_bounds(tri_mesh)
-        volume = extents[0] * extents[1] * extents[2]
+    for i, mesh in enumerate(convex_slices):
+        mesh_to_origin, mesh_extents = u.axis_oriented_extents(mesh)
+        volume = mesh_extents[0] * mesh_extents[1] * mesh_extents[2]
         volumes.append(volume)
         sum += volume
+        if i + 1 < len(convex_slices):
+            u.msg(f"calculated {i + 1} volumes", "info", "\r")
+        else:
+            u.msg(f"calculated {i + 1} volumes", "info", "\n")
 
     sub_pcd_sizes = []
     for i, v in enumerate(volumes):
@@ -162,6 +167,7 @@ def main(file_, **kwargs):
         if i < 1 or i >= len(volumes) - 1:
             size *= 5
         sub_pcd_sizes.append(size)
+    u.msg(f"calculated pcd sizes", "info")
 
     for i, mesh in enumerate(convex_slices):
         # Covert the mesh from trimesh to o3d
@@ -178,14 +184,16 @@ def main(file_, **kwargs):
             number_of_points=sub_pcd_sizes[i], init_factor=5
         )
         pcd += sub_pcd
-
-    u.msg("computed point cloud", "info")
+        if i + 1 < Z_SLICE_COUNT:
+            u.msg(f"finished {i + 1} sub-pointclouds", "info", "\r")
+        else:
+            u.msg(f"finished {i + 1} sub-pointclouds", "info")
 
     # --------------- Remesh ---------------
     pcd.estimate_normals()
 
     # Add kerf to pcd
-    kerf = 10
+    kerf = 1
     for i, p in enumerate(pcd.points):
         pcd.points[i] = p + pcd.normals[i] * kerf
     u.msg("added kerf", "info")
@@ -337,7 +345,7 @@ def main(file_, **kwargs):
 
         # Rotate them back to their original position
         for i, p in enumerate(sorted_hull):
-            # p = u.rotate_z_rad(p, box_rotation)
+            p = u.rotate_z_rad(p, box_rotation)
             sorted_hull[i] = p + extents / 2
 
         # Scale it if necessary
