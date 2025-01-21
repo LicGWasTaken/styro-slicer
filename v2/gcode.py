@@ -18,6 +18,14 @@ def to_gcode(file_name: str, coords: list, rad: float):
         for p in r:
             s = f"G1 X{p[2]} Y{p[2]} Z{p[0]}\n"  # Machine z is software x
             file.write(s)
+
+        # Move outside of the working area 
+        s = f"G1 X{p[2] + 5} Y{p[2] + 5} Z{p[0]}\n"
+        file.write(s)
+        s = f"G1 X{p[2] + 5} Y{p[2] + 5} Z{0}\n"
+        file.write(s)
+
+        # Rotation
         s = f"G1 E{rad * (i + 1) * 180 / math.pi}\n"
         file.write(s)
 

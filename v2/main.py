@@ -153,10 +153,6 @@ def main(file_, **kwargs):
         volume = mesh_extents[0] * mesh_extents[1] * mesh_extents[2]
         volumes.append(volume)
         sum += volume
-        if i + 1 < len(convex_slices):
-            u.msg(f"calculated {i + 1} volumes", "info", "\r")
-        else:
-            u.msg(f"calculated {i + 1} volumes", "info", "\n")
 
     sub_pcd_sizes = []
     for i, v in enumerate(volumes):
@@ -345,7 +341,8 @@ def main(file_, **kwargs):
 
         # Rotate them back to their original position
         for i, p in enumerate(sorted_hull):
-            p = u.rotate_z_rad(p, box_rotation)
+            # Comment this line out when not plotting
+            # p = u.rotate_z_rad(p, box_rotation)
             sorted_hull[i] = p + extents / 2
 
         # Scale it if necessary
