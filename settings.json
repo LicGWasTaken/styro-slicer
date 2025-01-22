@@ -1,8 +1,9 @@
 {
-    "kerfs": 0.5,
+    "kerf": 0.5,
     "projection-axis": [0, 1, 0],
     "velocity": 10,
     "material-sizes": [[1000, 1000, 2000], [10, 20, 10], [300, 400, 500]],
+    "machine-size": [250, 250, 250],
     "mesh-alignment": null,
     "selected-material-size": null,
     "align-part": true,

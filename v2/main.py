@@ -14,11 +14,11 @@ import utils as u
 
 # x forward, y right, z up
 
-PCD_SIZE = 50000  # The total amount of points in the point cloud
+PCD_SIZE = 200000  # The total amount of points in the point cloud
 Z_SLICE_COUNT = 100  # The amount of subsections when remeshing along the z axis
-ROTATIONAL_SLICE_COUNT = 16  # The amount of subsections when subdividing rotationally
+ROTATIONAL_SLICE_COUNT = 8  # The amount of subsections when subdividing rotationally
 SUB_PCD_PRECISION = (
-    1 / 100
+    1 / 250
 )  # Factor to calculate the bounding box width compared to the total extent
 
 def main(file_, **kwargs):
@@ -36,39 +36,55 @@ def main(file_, **kwargs):
     u.msg(f"loaded mesh at {file_}", "info")
 
     # Get mesh boundaries
-    # Oriented Bounds also rotates the mesh, which isn't helpful in this scenario
-    # to_origin, extents = trimesh.bounds.oriented_bounds(tri_mesh)
+    # trimesh.bounds.oriented_bounds(tri_mesh) also rotates the mesh, which isn't helpful in this scenario
     to_origin, extents = u.axis_oriented_extents(tri_mesh)
     u.msg(f"mesh extents: {tri_mesh.extents}", "info")
 
-    # Select the smallest possible material size
+    # Scale it according to the kwargs
     selected_material_size = None
-    if "selected_material_size" in kwargs:
-        selected_material_size = kwargs["selected-material-size"]
-        pass
+    if "scale-to-machine" in kwargs.keys() and kwargs["scale-to-machine"]:
+        scale = kwargs["machine-size"] / extents
+        tri_mesh.apply_scale(scale)
+        u.msg("applied machine scaling", "info")
     else:
-        if "material-sizes" not in kwargs:
-            u.msg("no material-sizes passed, skipping process", "warning")
+        # Select the smallest possible material size
+        if "selected-material-size" in kwargs.keys() and kwargs["selected-material-size"] != None:
+            selected_material_size = kwargs["selected-material-size"]
         else:
-            sorted_extents = np.sort(extents)
+            if "material-sizes" not in kwargs.keys():
+                u.msg("no material-sizes passed, skipping process", "warning")
+            else:
+                sorted_extents = np.sort(extents)
 
-            # Sort the materials by volume
-            sorted_sizes = sorted(kwargs["material-sizes"], key=math.prod)
+                # Sort the materials by volume
+                sorted_sizes = sorted(kwargs["material-sizes"], key=math.prod)
 
-            for size in sorted_sizes:
-                valid = True
-                for i in range(3):
-                    if sorted_extents[i] >= sorted(size)[i]:
-                        valid = False
+                for size in sorted_sizes:
+                    valid = True
+                    for i in range(3):
+                        if sorted_extents[i] >= sorted(size)[i]:
+                            valid = False
 
-                if valid:
-                    selected_material_size = size
-                    u.msg(f"selected material size {selected_material_size}", "info")
-                    break
+                    if valid:
+                        selected_material_size = size
+                        u.msg(
+                            f"selected material size {selected_material_size}", "info"
+                        )
+                        break
 
-            if not valid:
-                u.msg("mesh doesn't fit within available sizes", "warning")
+                if not valid:
+                    u.msg("mesh doesn't fit within available sizes", "warning")
 
+        if (
+            selected_material_size != None
+            and "scale-to-material" in kwargs.keys()
+            and kwargs["scale-to-material"]
+        ):
+            scale = selected_material_size / extents
+            tri_mesh.apply_scale(scale)
+            u.msg("applied material scaling", "info")
+
+    to_origin, extents = u.axis_oriented_extents(tri_mesh)
     tri_mesh = tri_mesh.apply_transform(to_origin)
 
     # Translate to only have positive vertices
@@ -107,7 +123,7 @@ def main(file_, **kwargs):
         tri_mesh = tri_mesh.apply_transform(rotation_matrix)
 
         # Update extents
-        to_origin, extents = u.axis_oriented_extents(tri_mesh)  
+        to_origin, extents = u.axis_oriented_extents(tri_mesh)
 
     # --------------- Slicing ---------------
     u.msg("Computing convex hulls", "process")
@@ -180,6 +196,7 @@ def main(file_, **kwargs):
             number_of_points=sub_pcd_sizes[i], init_factor=5
         )
         pcd += sub_pcd
+
         if i + 1 < Z_SLICE_COUNT:
             u.msg(f"finished {i + 1} sub-pointclouds", "info", "\r")
         else:
@@ -311,14 +328,14 @@ def main(file_, **kwargs):
         # Loop between extrema to sort a list from bottom to top
         # Compare distances to get the closest neighbor
         idx = min_idx[0]
-        sorted_hull_indeces = []
+        sorted_hull_indices = []
         while True:
-            sorted_hull_indeces.append(idx)
+            sorted_hull_indices.append(idx)
 
             if idx == min_idx[1]:
                 break
 
-            minimum = 100
+            minimum = np.inf
             minimum_idx = 0
             for i, p in enumerate(concave_hull_points):
                 if i == idx:
@@ -327,13 +344,14 @@ def main(file_, **kwargs):
                 distance = u.sphere_SDF(
                     origin=concave_hull_points[idx], point=p, radius=1
                 )
-                if distance < minimum and i not in sorted_hull_indeces:
+
+                if distance < minimum and i not in sorted_hull_indices:
                     minimum = distance
                     minimum_idx = i
 
             idx = minimum_idx
 
-        sorted_hull = concave_hull_points[sorted_hull_indeces]
+        sorted_hull = concave_hull_points[sorted_hull_indices]
 
         # Add the y coordinate back as zeros
         zeros = np.zeros((sorted_hull.shape[0],))
@@ -343,15 +361,16 @@ def main(file_, **kwargs):
         for i, p in enumerate(sorted_hull):
             # Comment this line out when not plotting
             # p = u.rotate_z_rad(p, box_rotation)
-            sorted_hull[i] = p + extents / 2
+            p = u.rotate_z_rad(p, math.pi)
+            sorted_hull[i] = p + (extents / 2)
 
         # Scale it if necessary
         # TODO add argument
-        machine_extents = [250, 250, 250]
-        for i, p in enumerate(sorted_hull):
-            for j in range(3):
-                p[j] *= machine_extents[j] / extents[j]
-            sorted_hull[i] = p
+        # machine_extents = [250, 250, 250]
+        # for i, p in enumerate(sorted_hull):
+        #     for j in range(3):
+        #         p[j] *= machine_extents[j] / extents[j]
+        #     sorted_hull[i] = p
 
         concave_hulls.append(np.asarray(sorted_hull))
 
@@ -379,6 +398,10 @@ if __name__ == "__main__":
     try:
         file_, kwargs = argv.get_arguments()
     except TypeError:
+        u.msg(
+            "TypeError from get_arguments",
+            "debug",
+        )
         sys.exit()
 
     # Run the program

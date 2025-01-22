@@ -40,16 +40,12 @@ def get_arguments():
         u.msg("invalid file path", "error")
         return 3
 
-    if not check_kwargs_validity(kwargs):
-        u.msg("invalid arguments", "error")
-        return 4
-    
     # Get the file path
     if os.path.isfile(args.file_):
         path = args.file_
     else:
         path = prefs.MESH_FOLDER + args.file_
- 
+
     # Load settings json in read mode
     with open(prefs.JSON_FOLDER + "settings.json", "r") as file:
         settings = json.load(file)
@@ -58,6 +54,10 @@ def get_arguments():
     for key in settings.keys():
         if key not in kwargs:
             kwargs[key] = settings[key]
+
+    if not check_kwargs_validity(kwargs):
+        u.msg("invalid arguments", "error")
+        return 4
 
     u.msg(f"{len(kwargs)} settings passed", "info")
     return path, kwargs
@@ -104,6 +104,9 @@ def check_kwargs_validity(kwargs: dict):
             u.msg(f"{key}: invalid argument", "error")
             return 0
 
+        if value == None:
+            continue
+
         type_ = prefs.VALID_ARGVS[key]
         if isinstance(type_, type):
             try:
@@ -116,10 +119,6 @@ def check_kwargs_validity(kwargs: dict):
             if not u.is_structured(value, type_):
                 u.msg("invalid list structure", "error")
                 return 0
-    
-    # Load settings json in read mode
-    with open(prefs.JSON_FOLDER + "settings.json", "r") as file:
-        settings = json.load(file)
 
     # Handle argument specific conditions
     if "projection-axis" in kwargs.keys():
@@ -127,21 +126,43 @@ def check_kwargs_validity(kwargs: dict):
         if kwargs["projection-axis"] not in valid_values:
             u.msg("invalid projection-axis", "error")
             return 0
-        
+
     if "selected-material-size" in kwargs.keys():
-        if kwargs["selected-material-size"] not in settings["material-sizes"]:
+        if (
+            kwargs["selected-material-size"] != None
+            and kwargs["selected-material-size"] not in kwargs["material-sizes"]
+        ):
             u.msg("invalid selected-material-size", "error")
             return 0
-        
+
     if "mesh-alignment" in kwargs.keys():
-        if not ([1, 0, 0] in kwargs["mesh-alignment"]
+        if kwargs["mesh-alignment"] != None and not (
+            [1, 0, 0] in kwargs["mesh-alignment"]
             and [0, 1, 0] in kwargs["mesh-alignment"]
-            and [0, 0, 1] in kwargs["mesh-alignment"]):
+            and [0, 0, 1] in kwargs["mesh-alignment"]
+        ):
             u.msg("invalid mesh-alignment", "error")
             return 0
-        
+
         if "align-part" in kwargs.keys():
             kwargs["align-part"] = True
+
+    if (
+        "scale-to-machine" in kwargs.keys()
+        and kwargs["scale-to-machine"]
+        and "scale-to-material" in kwargs.keys()
+        and kwargs["scale-to-material"]
+    ):
+        u.msg("scale-to-machine and scale-to-material are both set to True", "error")
+        return 0
+
+    if (
+        "scale-to-machine" in kwargs.keys()
+        and kwargs["scale-to-machine"]
+        and "machine-size" not in kwargs.keys()
+    ):
+        u.msg("no machine-size passed", "error")
+        return 0
 
     return 1
 

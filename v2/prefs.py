@@ -7,10 +7,11 @@ NUMPY_DECIMALS = 5
 MOTOR_AXIS = [1, 0, 0]
 
 DEFAULT_SETTINGS = {
-    "kerfs": 0.5,
+    "kerf": 0.5,
     "projection-axis": [0, 1, 0],
     "velocity": 10,
     "material-sizes": [[1000, 1000, 2000]],
+    "machine-size": [1000, 1000, 1000],
     "mesh-alignment": None,
     "selected-material-size": None,
     "align-part": True,
@@ -24,10 +25,11 @@ DEFAULT_SETTINGS = {
 # Frontend
 VALID_ARGVS = {
     "save-as-prefs": bool,
-    "kerfs": float,
+    "kerf": float,
     "projection-axis": [int, int, int],
     "velocity": float,
     "material-sizes": [[int, int, int]],
+    "machine-size": [int, int, int],
     "mesh-alignment": [[int, int, int], [int, int, int], [int, int, int]],
     "selected-material-size": [int, int, int],
     "align-part": bool,

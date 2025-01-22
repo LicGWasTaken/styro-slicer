@@ -12,7 +12,7 @@ from mpl_toolkits.mplot3d import Axes3D
 
 def msg(str, type="debug", end="\n"):
     if type == "error":
-        print(colorama.Style.BRIGHT + colorama.Fore.RED + str, end=end)
+        print(colorama.Style.BRIGHT + colorama.Fore.MAGENTA + str, end=end)
     elif type =="warning":
         print(colorama.Style.NORMAL + colorama.Fore.YELLOW + str, end=end)
     elif type =="process":
