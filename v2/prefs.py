@@ -9,7 +9,7 @@ MOTOR_AXIS = [1, 0, 0]
 DEFAULT_SETTINGS = {
     "kerf": 0.5,
     "projection-axis": [0, 1, 0],
-    "velocity": 10,
+    "velocity": 100,
     "material-sizes": [[1000, 1000, 2000]],
     "machine-size": [1000, 1000, 1000],
     "mesh-alignment": None,
@@ -27,7 +27,7 @@ VALID_ARGVS = {
     "save-as-prefs": bool,
     "kerf": float,
     "projection-axis": [int, int, int],
-    "velocity": float,
+    "velocity": int,
     "material-sizes": [[int, int, int]],
     "machine-size": [int, int, int],
     "mesh-alignment": [[int, int, int], [int, int, int], [int, int, int]],

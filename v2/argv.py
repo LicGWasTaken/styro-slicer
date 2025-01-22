@@ -135,7 +135,7 @@ def check_kwargs_validity(kwargs: dict):
             u.msg("invalid selected-material-size", "error")
             return 0
 
-    if "mesh-alignment" in kwargs.keys():
+    if "mesh-alignment" in kwargs.keys() and kwargs["mesh-alignment"] != None:
         if kwargs["mesh-alignment"] != None and not (
             [1, 0, 0] in kwargs["mesh-alignment"]
             and [0, 1, 0] in kwargs["mesh-alignment"]
@@ -162,6 +162,15 @@ def check_kwargs_validity(kwargs: dict):
         and "machine-size" not in kwargs.keys()
     ):
         u.msg("no machine-size passed", "error")
+        return 0
+    
+    if (
+        "as-convex-hull" in kwargs.keys()
+        and kwargs["as-convex-hull"]
+        and "as-projection" in kwargs.keys()
+        and kwargs["as-projection"]
+    ):
+        u.msg("multiple slicing modes set to True", "error")
         return 0
 
     return 1

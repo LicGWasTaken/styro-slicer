@@ -13,19 +13,19 @@
 * Arguments marked as *'req'* are mandatory.
 * To save the given arguments as preferences, simply add ***'save-as-prefs': True*** as an additional argument.
 
-***kerf*** - float X
+***kerf*** - float
 offset in mm from the contour of the mesh. Varies with wire width and heat.&nbsp;
 
 ***projection-axis*** - array *((3), int)* X
 plane normal of projection planes. e.g. *'[0, 1, 0]'*, invalid if not one the X, Y, or Z axis.&nbsp;
 
-***velocity*** - float X
-The cutting speed.&nbsp;
+***velocity*** - int
+The cutting speed. Corresponds to the gcode's F-Value.&nbsp;
 
 ***material-sizes*** - array *((3,), int)*
 Available material size(s). e.g. *'[100, 40, 60], [200, 400, 700]'*.&nbsp;
 
-***machine-size*** - array *((3), int)* X
+***machine-size*** - array *((3), int)*
 Machine size for scaling. e.g. *'[100, 40, 60]'*.&nbsp;
 
 ***mesh-alignment*** - array*((3, 3, 3), int)*

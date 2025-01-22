@@ -12,13 +12,19 @@ import time
 import trimesh
 import utils as u
 
+"""TODO
+.step Support (r = trimesh.Trimesh(**trimesh.interfaces.gmsh.load_gmsh('orn.stp')))
+slicing for linear parts
+GUI
+"""
+
 # x forward, y right, z up
 
-PCD_SIZE = 200000  # The total amount of points in the point cloud
-Z_SLICE_COUNT = 100  # The amount of subsections when remeshing along the z axis
-ROTATIONAL_SLICE_COUNT = 8  # The amount of subsections when subdividing rotationally
+PCD_SIZE = 20000  # The total amount of points in the point cloud
+Z_SLICE_COUNT = 20  # The amount of subsections when remeshing along the z axis
+ROTATIONAL_SLICE_COUNT = 4  # The amount of subsections when subdividing rotationally
 SUB_PCD_PRECISION = (
-    1 / 250
+    1 / 100
 )  # Factor to calculate the bounding box width compared to the total extent
 
 def main(file_, **kwargs):
@@ -35,6 +41,11 @@ def main(file_, **kwargs):
     tri_mesh = trimesh.load_mesh(file_)
     u.msg(f"loaded mesh at {file_}", "info")
 
+    # # For issues with incorrect unit conversions
+    # mm_to_inch = True
+    # if mm_to_inch:
+    #     tri_mesh.apply_scale(1/25.4)
+
     # Get mesh boundaries
     # trimesh.bounds.oriented_bounds(tri_mesh) also rotates the mesh, which isn't helpful in this scenario
     to_origin, extents = u.axis_oriented_extents(tri_mesh)
@@ -50,15 +61,13 @@ def main(file_, **kwargs):
         if "material-sizes" not in kwargs.keys():
             u.msg("no material-sizes passed, skipping process", "warning")
         else:
-            sorted_extents = np.sort(extents)
-
             # Sort the materials by volume
             sorted_sizes = sorted(kwargs["material-sizes"], key=math.prod)
 
             for size in sorted_sizes:
                 valid = True
                 for i in range(3):
-                    if sorted_extents[i] >= sorted(size)[i]:
+                    if np.sort(extents)[i] >= sorted(size)[i]:
                         valid = False
 
                 if valid:
@@ -71,11 +80,6 @@ def main(file_, **kwargs):
 
     to_origin, extents = u.axis_oriented_extents(tri_mesh)
     tri_mesh = tri_mesh.apply_transform(to_origin)
-
-    # Translate to only have positive vertices
-    tri_mesh.vertices += extents / 2
-    tri_mesh.vertices = np.round(tri_mesh.vertices, prefs.NUMPY_DECIMALS)
-    tri_mesh.vertices = np.where(tri_mesh.vertices == -0.0, 0.0, tri_mesh.vertices)
 
     # Align the mesh
     if (
@@ -94,7 +98,7 @@ def main(file_, **kwargs):
             rotation_matrix = np.concatenate([rotation_matrix, [[0], [0], [0]]], axis=1)
         else:
             # The index of the biggest extent to be aligned with the z axis
-            idx = np.where(extents == sorted_extents[2])[0][0]
+            idx = np.where(extents == np.sort(extents)[2])[0][0]
             if idx == 0:  # x-axis
                 rotation_matrix = np.array([[0, 0, 1, 0], [0, 1, 0, 0], [1, 0, 0, 0]])
             elif idx == 1:  # y-axis
@@ -107,11 +111,10 @@ def main(file_, **kwargs):
         to_origin, extents = u.axis_oriented_extents(tri_mesh)
 
     # Scale it according to the kwargs
-    selected_material_size = None
     if "scale-to-material" in kwargs.keys() and kwargs["scale-to-machine"]:
         scale = kwargs["machine-size"] / extents
         tri_mesh.apply_scale(scale)
-        u.msg(f"applied machine scaling: {kwargs["machine-size"]}", "info")
+        u.msg(f"applied machine scaling", "info")
     elif (
         selected_material_size != None
         and "scale-to-material" in kwargs.keys()
@@ -122,6 +125,15 @@ def main(file_, **kwargs):
         u.msg("applied material scaling", "info")
 
     to_origin, extents = u.axis_oriented_extents(tri_mesh)
+    tri_mesh = tri_mesh.apply_transform(to_origin)
+
+    # Translate to only have positive vertices
+    tri_mesh.vertices += extents / 2
+    tri_mesh.vertices = np.round(tri_mesh.vertices, prefs.NUMPY_DECIMALS)
+    tri_mesh.vertices = np.where(tri_mesh.vertices == -0.0, 0.0, tri_mesh.vertices)
+
+    # tri_mesh.export(prefs.MESH_FOLDER + "mesh.stl")
+    # return
 
     # --------------- Slicing ---------------
     u.msg("Computing convex hulls", "process")
@@ -363,14 +375,6 @@ def main(file_, **kwargs):
             p = u.rotate_z_rad(p, math.pi)
             sorted_hull[i] = p + (extents / 2)
 
-        # Scale it if necessary
-        # TODO add argument
-        # machine_extents = [250, 250, 250]
-        # for i, p in enumerate(sorted_hull):
-        #     for j in range(3):
-        #         p[j] *= machine_extents[j] / extents[j]
-        #     sorted_hull[i] = p
-
         concave_hulls.append(np.asarray(sorted_hull))
 
         if n + 1 < ROTATIONAL_SLICE_COUNT:
@@ -378,7 +382,7 @@ def main(file_, **kwargs):
         else:
             u.msg(f"finished {n + 1} sections", "info")
 
-    gcode.to_gcode("output", concave_hulls, 2 * math.pi / ROTATIONAL_SLICE_COUNT)
+    gcode.to_gcode("output", concave_hulls, 2 * math.pi / ROTATIONAL_SLICE_COUNT, kwargs["velocity"])
 
     arr = []
     for x in concave_hulls:
