@@ -40,49 +40,34 @@ def main(file_, **kwargs):
     to_origin, extents = u.axis_oriented_extents(tri_mesh)
     u.msg(f"mesh extents: {tri_mesh.extents}", "info")
 
-    # Scale it according to the kwargs
-    selected_material_size = None
-    if "scale-to-machine" in kwargs.keys() and kwargs["scale-to-machine"]:
-        scale = kwargs["machine-size"] / extents
-        tri_mesh.apply_scale(scale)
-        u.msg("applied machine scaling", "info")
+    # Select the smallest possible material size
+    if (
+        "selected-material-size" in kwargs.keys()
+        and kwargs["selected-material-size"] != None
+    ):
+        selected_material_size = kwargs["selected-material-size"]
     else:
-        # Select the smallest possible material size
-        if "selected-material-size" in kwargs.keys() and kwargs["selected-material-size"] != None:
-            selected_material_size = kwargs["selected-material-size"]
+        if "material-sizes" not in kwargs.keys():
+            u.msg("no material-sizes passed, skipping process", "warning")
         else:
-            if "material-sizes" not in kwargs.keys():
-                u.msg("no material-sizes passed, skipping process", "warning")
-            else:
-                sorted_extents = np.sort(extents)
+            sorted_extents = np.sort(extents)
 
-                # Sort the materials by volume
-                sorted_sizes = sorted(kwargs["material-sizes"], key=math.prod)
+            # Sort the materials by volume
+            sorted_sizes = sorted(kwargs["material-sizes"], key=math.prod)
 
-                for size in sorted_sizes:
-                    valid = True
-                    for i in range(3):
-                        if sorted_extents[i] >= sorted(size)[i]:
-                            valid = False
+            for size in sorted_sizes:
+                valid = True
+                for i in range(3):
+                    if sorted_extents[i] >= sorted(size)[i]:
+                        valid = False
 
-                    if valid:
-                        selected_material_size = size
-                        u.msg(
-                            f"selected material size {selected_material_size}", "info"
-                        )
-                        break
+                if valid:
+                    selected_material_size = size
+                    u.msg(f"selected material size {selected_material_size}", "info")
+                    break
 
-                if not valid:
-                    u.msg("mesh doesn't fit within available sizes", "warning")
-
-        if (
-            selected_material_size != None
-            and "scale-to-material" in kwargs.keys()
-            and kwargs["scale-to-material"]
-        ):
-            scale = selected_material_size / extents
-            tri_mesh.apply_scale(scale)
-            u.msg("applied material scaling", "info")
+            if not valid:
+                u.msg("mesh doesn't fit within available sizes", "warning")
 
     to_origin, extents = u.axis_oriented_extents(tri_mesh)
     tri_mesh = tri_mesh.apply_transform(to_origin)
@@ -118,12 +103,25 @@ def main(file_, **kwargs):
                 rotation_matrix = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]])
 
         rotation_matrix = np.append(rotation_matrix, [[0, 0, 0, 1]], axis=0)
-
-        # Apply the transformation
         tri_mesh = tri_mesh.apply_transform(rotation_matrix)
-
-        # Update extents
         to_origin, extents = u.axis_oriented_extents(tri_mesh)
+
+    # Scale it according to the kwargs
+    selected_material_size = None
+    if "scale-to-material" in kwargs.keys() and kwargs["scale-to-machine"]:
+        scale = kwargs["machine-size"] / extents
+        tri_mesh.apply_scale(scale)
+        u.msg(f"applied machine scaling: {kwargs["machine-size"]}", "info")
+    elif (
+        selected_material_size != None
+        and "scale-to-material" in kwargs.keys()
+        and kwargs["scale-to-material"]
+    ):
+        scale = selected_material_size / extents
+        tri_mesh.apply_scale(scale)
+        u.msg("applied material scaling", "info")
+
+    to_origin, extents = u.axis_oriented_extents(tri_mesh)
 
     # --------------- Slicing ---------------
     u.msg("Computing convex hulls", "process")
@@ -206,10 +204,11 @@ def main(file_, **kwargs):
     pcd.estimate_normals()
 
     # Add kerf to pcd
-    kerf = 1
-    for i, p in enumerate(pcd.points):
-        pcd.points[i] = p + pcd.normals[i] * kerf
-    u.msg("added kerf", "info")
+    if "kerf" in kwargs.keys():
+        kerf = kwargs["kerf"]
+        for i, p in enumerate(pcd.points):
+            pcd.points[i] = p + pcd.normals[i] * kerf
+        u.msg("added kerf", "info")
 
     # Estimate radius for rolling ball
     distances = pcd.compute_nearest_neighbor_distance()

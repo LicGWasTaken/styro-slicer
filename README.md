@@ -37,10 +37,10 @@ The chosen material size, passed as an array. Otherwise selects the smallest pos
 ***align-part*** - bool
 Align part to vertical axis.&nbsp;
 
-***scale-to-machine*** - bool X 
+***scale-to-machine*** - bool
 Scale the part down to fit within the machine boundaries.&nbsp;
 
-***scale-to-material*** - bool X
+***scale-to-material*** - bool
 Scale the part down to fit within the available material sizes.&nbsp;
 
 ***slice-to-fit*** - bool X
