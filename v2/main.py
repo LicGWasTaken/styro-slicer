@@ -13,6 +13,12 @@ import trimesh
 import utils as u
 
 """TODO
+X and Y axes have averaged speed because the machine thinks they are perpendicular. Therefore, increase the speed according to pythagoras.
+run_time function doesn't work at all
+Instead of moving out to a fixed position, move slightly outside the block's boundary.
+Scale-to-machine and -material currently update all axes. It makes more sense for them to only scale the longest axis and keep everything else proportional.
+Also probably smart to remove the 2 different scaling settings and just put in a scaling factor.
+Clean up output by renaming the files and moving them to a different folder.
 .step Support (r = trimesh.Trimesh(**trimesh.interfaces.gmsh.load_gmsh('orn.stp')))
 slicing for linear parts
 GUI
@@ -20,11 +26,11 @@ GUI
 
 # x forward, y right, z up
 
-PCD_SIZE = 20000  # The total amount of points in the point cloud
-Z_SLICE_COUNT = 20  # The amount of subsections when remeshing along the z axis
-ROTATIONAL_SLICE_COUNT = 4  # The amount of subsections when subdividing rotationally
+PCD_SIZE = 100000  # The total amount of points in the point cloud
+Z_SLICE_COUNT = 100  # The amount of subsections when remeshing along the z axis
+ROTATIONAL_SLICE_COUNT = 10  # The amount of subsections when subdividing rotationally
 SUB_PCD_PRECISION = (
-    1 / 100
+    1 / 250
 )  # Factor to calculate the bounding box width compared to the total extent
 
 def main(file_, **kwargs):
@@ -235,8 +241,6 @@ def main(file_, **kwargs):
     v = np.asarray(convex_mesh.vertices)
     t = np.asarray(convex_mesh.triangles)
     mesh = trimesh.Trimesh(v, t, vertex_normals=np.asarray(convex_mesh.vertex_normals))
-    trimesh.convex.is_convex(mesh)
-    # trimesh.repair.fill_holes(mesh)
     mesh.export(prefs.MESH_FOLDER + "convex_mesh.stl")
 
     # Update mesh extents
@@ -373,14 +377,14 @@ def main(file_, **kwargs):
             # Comment this line out when not plotting
             # p = u.rotate_z_rad(p, box_rotation)
             p = u.rotate_z_rad(p, math.pi)
-            sorted_hull[i] = p + (extents / 2)
+            sorted_hull[i] = p # + (extents / 2)
 
         concave_hulls.append(np.asarray(sorted_hull))
 
         if n + 1 < ROTATIONAL_SLICE_COUNT:
-            u.msg(f"finished {n + 1} sections", "info", "\r")
+            u.msg(f"finished {n + 1} / {ROTATIONAL_SLICE_COUNT} sections", "info", "\r")
         else:
-            u.msg(f"finished {n + 1} sections", "info")
+            u.msg(f"finished {n + 1} / {ROTATIONAL_SLICE_COUNT} sections", "info")
 
     gcode.to_gcode("output", concave_hulls, 2 * math.pi / ROTATIONAL_SLICE_COUNT, kwargs["velocity"])
 

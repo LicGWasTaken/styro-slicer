@@ -8,3 +8,5 @@ docker run -it --rm -v $(pwd)/v2:/workspace/code -v $(pwd)/obj:/workspace/obj tr
 docker image prune -f
 docker buildx prune -f
 
+python main.py Celly.stl --kwargs "{'align-part': True, 'scale-to-material': True, 'material-sizes': [[60, 70, 205]], 'selected-material-size': [60, 70, 205]}"
+
