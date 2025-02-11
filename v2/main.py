@@ -13,6 +13,7 @@ import trimesh
 import utils as u
 
 """TODO
+Parts like totodile.stl get cut incorrectly since the rotation at certain points intersects the mesh
 X and Y axes have averaged speed because the machine thinks they are perpendicular. Therefore, increase the speed according to pythagoras.
 run_time function doesn't work at all
 Instead of moving out to a fixed position, move slightly outside the block's boundary.
@@ -26,11 +27,11 @@ GUI
 
 # x forward, y right, z up
 
-PCD_SIZE = 100000  # The total amount of points in the point cloud
-Z_SLICE_COUNT = 100  # The amount of subsections when remeshing along the z axis
-ROTATIONAL_SLICE_COUNT = 10  # The amount of subsections when subdividing rotationally
+PCD_SIZE = 50000  # The total amount of points in the point cloud
+Z_SLICE_COUNT = 50  # The amount of subsections when remeshing along the z axis
+ROTATIONAL_SLICE_COUNT = 8  # The amount of subsections when subdividing rotationally
 SUB_PCD_PRECISION = (
-    1 / 250
+    1 / 100
 )  # Factor to calculate the bounding box width compared to the total extent
 
 def main(file_, **kwargs):
@@ -44,7 +45,7 @@ def main(file_, **kwargs):
     u.msg("Loading mesh data", "process")
 
     # Load mesh
-    tri_mesh = trimesh.load_mesh(file_)
+    in_mesh = trimesh.load_mesh(file_)
     u.msg(f"loaded mesh at {file_}", "info")
 
     # # For issues with incorrect unit conversions
@@ -54,8 +55,8 @@ def main(file_, **kwargs):
 
     # Get mesh boundaries
     # trimesh.bounds.oriented_bounds(tri_mesh) also rotates the mesh, which isn't helpful in this scenario
-    to_origin, extents = u.axis_oriented_extents(tri_mesh)
-    u.msg(f"mesh extents: {tri_mesh.extents}", "info")
+    to_origin, extents = u.axis_oriented_extents(in_mesh)
+    u.msg(f"mesh extents: {in_mesh.extents}", "info")
 
     # Select the smallest possible material size
     if (
@@ -84,8 +85,8 @@ def main(file_, **kwargs):
             if not valid:
                 u.msg("mesh doesn't fit within available sizes", "warning")
 
-    to_origin, extents = u.axis_oriented_extents(tri_mesh)
-    tri_mesh = tri_mesh.apply_transform(to_origin)
+    to_origin, extents = u.axis_oriented_extents(in_mesh)
+    in_mesh = in_mesh.apply_transform(to_origin)
 
     # Align the mesh
     if (
@@ -113,13 +114,13 @@ def main(file_, **kwargs):
                 rotation_matrix = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]])
 
         rotation_matrix = np.append(rotation_matrix, [[0, 0, 0, 1]], axis=0)
-        tri_mesh = tri_mesh.apply_transform(rotation_matrix)
-        to_origin, extents = u.axis_oriented_extents(tri_mesh)
+        in_mesh = in_mesh.apply_transform(rotation_matrix)
+        to_origin, extents = u.axis_oriented_extents(in_mesh)
 
     # Scale it according to the kwargs
     if "scale-to-material" in kwargs.keys() and kwargs["scale-to-machine"]:
         scale = kwargs["machine-size"] / extents
-        tri_mesh.apply_scale(scale)
+        in_mesh.apply_scale(scale)
         u.msg(f"applied machine scaling", "info")
     elif (
         selected_material_size != None
@@ -127,19 +128,16 @@ def main(file_, **kwargs):
         and kwargs["scale-to-material"]
     ):
         scale = selected_material_size / extents
-        tri_mesh.apply_scale(scale)
+        in_mesh.apply_scale(scale)
         u.msg("applied material scaling", "info")
 
-    to_origin, extents = u.axis_oriented_extents(tri_mesh)
-    tri_mesh = tri_mesh.apply_transform(to_origin)
+    to_origin, extents = u.axis_oriented_extents(in_mesh)
+    in_mesh = in_mesh.apply_transform(to_origin)
 
     # Translate to only have positive vertices
-    tri_mesh.vertices += extents / 2
-    tri_mesh.vertices = np.round(tri_mesh.vertices, prefs.NUMPY_DECIMALS)
-    tri_mesh.vertices = np.where(tri_mesh.vertices == -0.0, 0.0, tri_mesh.vertices)
-
-    # tri_mesh.export(prefs.MESH_FOLDER + "mesh.stl")
-    # return
+    in_mesh.vertices += extents / 2
+    in_mesh.vertices = np.round(in_mesh.vertices, prefs.NUMPY_DECIMALS)
+    in_mesh.vertices = np.where(in_mesh.vertices == -0.0, 0.0, in_mesh.vertices)
 
     # --------------- Slicing ---------------
     u.msg("Computing convex hulls", "process")
@@ -149,7 +147,7 @@ def main(file_, **kwargs):
         # Slice from below
         plane_origin = [0, 0, (extents[2] / Z_SLICE_COUNT) * i * 0.999]
         tmp = trimesh.intersections.slice_mesh_plane(
-            tri_mesh, plane_normal=[0, 0, 1], plane_origin=plane_origin
+            in_mesh, plane_normal=[0, 0, 1], plane_origin=plane_origin
         )
 
         # Slice from above
@@ -375,9 +373,9 @@ def main(file_, **kwargs):
         # Rotate them back to their original position
         for i, p in enumerate(sorted_hull):
             # Comment this line out when not plotting
-            # p = u.rotate_z_rad(p, box_rotation)
-            p = u.rotate_z_rad(p, math.pi)
-            sorted_hull[i] = p # + (extents / 2)
+            p = u.rotate_z_rad(p, box_rotation)
+            # p = u.rotate_z_rad(p, math.pi)
+            sorted_hull[i] = p  # + (extents / 2)
 
         concave_hulls.append(np.asarray(sorted_hull))
 
@@ -386,14 +384,106 @@ def main(file_, **kwargs):
         else:
             u.msg(f"finished {n + 1} / {ROTATIONAL_SLICE_COUNT} sections", "info")
 
-    gcode.to_gcode("output", concave_hulls, 2 * math.pi / ROTATIONAL_SLICE_COUNT, kwargs["velocity"])
+    out = []
+    for h in concave_hulls:
+        for p in h:
+            out.append(p)
+    u.plot(np.asarray(out))
 
-    arr = []
-    for x in concave_hulls:
-        for y in x:
-            arr.append(y)
-    arr = np.asarray(arr)
-    u.plot(arr)
+    # --------------- Preview ---------------
+    aligned_hulls = []
+    linear_eqs = {}
+    for arr in concave_hulls:
+        tmp = []
+        for p0 in concave_hulls[0]:
+            for i, p1 in enumerate(arr):
+                if p1[2] >= p0[2]:
+                    break
+
+            # Interpolating the z coordinate doesn't seem to be necessary for big pcd
+            new = arr[i]
+            tmp.append(np.asarray(new))
+
+            # Calculate the point's tangent's equation
+            # linear_eq = [k, d]
+            x = new[0]
+            y = new[1]
+            linear_eq = None
+            if np.isclose(x, 0):
+                linear_eq = [0, y]
+            # TODO
+            elif np.isclose(y, 0):
+                linear_eq = x
+            else:
+                # Linear equation perpendicular to normal
+                # y = kx + d
+                k = -x / y
+                d = y - k * x
+                linear_eq = [k, d]
+
+            linear_eqs[str(new)] = linear_eq
+        aligned_hulls.append(tmp)
+    
+    # Define line intersections
+    out = []
+    for i, arr in enumerate(aligned_hulls):
+        for j, p in enumerate(arr):
+            eq0 = linear_eqs[str(arr[j])]
+
+            if i < len(aligned_hulls) - 1:
+                eq1 = linear_eqs[str(aligned_hulls[i + 1][j])]
+            else:
+                eq1 = linear_eqs[str(aligned_hulls[0][j])]
+
+            if i > 0:   
+                eq2 = linear_eqs[str(aligned_hulls[i - 1][j])]
+            else:
+                eq2 = linear_eqs[str(aligned_hulls[len(aligned_hulls) - 1][j])] 
+
+            eqs = [eq1, eq2]
+            for eq in eqs:
+                # y = k1 * x + d1, y = k0 * x + d0
+                # k0 * x + d0 = k1 * x + d1
+                # k0 * x - k1 * x = d1 - d0
+                # x = (d1 - d0) / (k0 - k1)
+
+                if not isinstance(eq0, list):
+                    x = eq0
+                    y = eq[0] * x + eq[1]
+                elif not isinstance(eq, list):
+                    x = eq
+                    y = eq0[0] * x + eq0[1]
+                else:
+                    x = (eq[1] - eq0[1]) / (eq0[0] - eq[0])
+                    y = eq0[0] * x + eq0[1]
+                intersection = np.asarray([x, y, p[2]])
+
+                v = intersection - p
+                point_count = 20
+                distance = u.magnitude(v) / point_count
+                v = u.normalize(v)
+                for k in range(point_count):
+                    new = p + v * distance * k
+                    out.append(new)
+    
+    # Export to a mesh
+    out_pcd = o3d.geometry.PointCloud()
+    out_pcd.points = o3d.utility.Vector3dVector(out)
+    out_pcd = out_pcd.farthest_point_down_sample(10000)
+
+    out_pcd.estimate_normals()
+    distances = out_pcd.compute_nearest_neighbor_distance()
+    avg_dist = np.mean(distances)
+    radius = 1.5 * avg_dist
+
+    _mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(
+        out_pcd, o3d.utility.DoubleVector([radius, radius * 2])
+    )
+
+    v = np.asarray(_mesh.vertices)
+    t = np.asarray(_mesh.triangles)
+    _mesh = trimesh.Trimesh(v, t, vertex_normals=np.asarray(_mesh.vertex_normals))
+    _mesh.export(prefs.MESH_FOLDER + "sliced_mesh.stl")
 
     return 0
 

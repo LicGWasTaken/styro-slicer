@@ -68,6 +68,9 @@ def magnitude(v):
         return math.sqrt(v[0]**2 + v[1]**2 + v[2]**2)
     except:
         return math.sqrt(v[0]**2 + v[1]**2)
+
+def normalize(v: np.ndarray):
+    return v / magnitude(v)
     
 def clamp(n, min, max):
     return min * (n < min) + max * (n > max) + n * (n >= min and n <= max)
@@ -129,6 +132,7 @@ def minkowski(a: np.array, b: np.array):
 def plot(arr: np.ndarray, color:str = "hotpink"):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="3d")
+    ax.set_aspect('equal', adjustable='box')
     try:
         ax.scatter(arr[:, 0], arr[:, 1], arr[:, 2], color=color)
     except:

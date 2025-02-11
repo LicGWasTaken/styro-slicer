@@ -17,17 +17,17 @@ def to_gcode(file_name: str, coords: list, rad: float, velocity: int):
     file.write("\n")
     file.write(f"G1 F{feed}\nG1 X10 Y10 Z0\nG1 F{velocity}\n")
 
-    val = 110
+    offset = 65
     # Main code
     for i, r in enumerate(coords):
         # Move into the working area
         s = f"G1 F{velocity}\n"
-        s += f"G1 X{r[0][2] - 5 + val} Y{r[0][2] - 5 + val} Z{50}\n"
-        s += f"G1 X{r[0][2] - 5 + val} Y{r[0][2] - 5 + val} Z{r[0][0] + 155}\n"
+        s += f"G1 X{r[0][2] - 5 + offset} Y{bottom_approach_z(r) + offset} Z{50}\n"
+        s += f"G1 X{r[0][2] - 5 + offset} Y{bottom_approach_z(r) + offset} Z{r[0][0] + 155}\n"
         file.write(s)
 
         for j, p in enumerate(r):
-            p += np.asarray([155, 155, val])
+            p += np.asarray([155, 155, offset])
             if j % 2 == 0:
                 continue
             s = f"G1 X{p[2]} Y{p[2]} Z{p[0]}\n"#\n"  # Machine z is software x#
@@ -36,8 +36,8 @@ def to_gcode(file_name: str, coords: list, rad: float, velocity: int):
             file.write(s)
 
         # Move outside of the working area
-        s = f"G1 X{p[2] + 5} Y{p[2] + 5} Z{p[0]}\n"
-        s += f"G1 X{p[2] + 5} Y{p[2] + 5} Z{50}\n"
+        s = f"G1 X{p[2] + 5} Y{top_approach_z(r)} Z{p[0]}\n"
+        s += f"G1 X{p[2] + 5} Y{top_approach_z(r)} Z{50}\n"
         s += f"G1 F{feed}\n"
         s += "G1 X10 Y10 Z50\n"
         file.write(s)
@@ -56,7 +56,16 @@ def to_gcode(file_name: str, coords: list, rad: float, velocity: int):
 
     return
 
+def top_approach_z(ps: np.ndarray):
+    # return max(ps[:, 2:]) - ps[len(ps)][2] + 5
+    return max(ps[:, 2]) + 5
+
+def bottom_approach_z(ps: np.ndarray):
+    # return ps[0][2] - min(ps[:, 2:]) - 5
+    return min(ps[:, 2]) - 5
+
 def run_time(coords: list, velocity: int):
+    """Not working, probaly because we are only calculating cutting sequences"""
     # Calculate the rough total circumference
     circumferece = 0
     for i, r in enumerate(coords):
