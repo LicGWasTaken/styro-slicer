@@ -86,6 +86,16 @@ def axis_oriented_extents(mesh: trimesh.Trimesh):
     to_origin[:3, 3] = -((max_ + min_) / 2)
     return to_origin, extents
 
+def linear_parameters_2d(point: np.ndarray):
+    if np.isclose(y, 0):
+        return None, x
+    else:
+        x = point[0]
+        y = point[1]
+        k = -x / y
+        d = y - k * x
+        return k, d
+
 def minkowski(a: np.array, b: np.array):
     """Both arrays have to be sorted counterclockwise beginning from the bottom left angle"""
     # Calculate the minkoski sum
