@@ -1,9 +1,9 @@
-docker build -t trimesh-env .
+docker build -t docker-env .
 
 v1
-docker run -it --rm -v $(pwd)/v1:/workspace/code -v $(pwd)/obj:/workspace/obj -v $(pwd)/plots:/workspace/plots -v $(pwd)/output:/workspace/output trimesh-env
+docker run -it --rm -v $(pwd)/v1:/workspace/code -v $(pwd)/obj:/workspace/obj -v $(pwd)/plots:/workspace/plots -v $(pwd)/output:/workspace/output docker-env
 v2
-docker run -it --rm -v $(pwd)/v2:/workspace/code -v $(pwd)/obj:/workspace/obj trimesh-env
+docker run -it --rm -v $(pwd)/v2:/workspace/code -v $(pwd)/obj:/workspace/obj docker-env
 
 docker image prune -f
 docker buildx prune -f

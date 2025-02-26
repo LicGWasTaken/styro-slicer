@@ -13,7 +13,6 @@ import trimesh
 import utils as u
 
 """TODO
-Add top and bottom to Preview mesh
 X and Y axes have averaged speed because the machine thinks they are perpendicular. Therefore, increase the speed according to pythagoras.
 run_time function doesn't work at all
 Instead of moving out to a fixed position, move slightly outside the block's boundary.
@@ -29,7 +28,7 @@ GUI
 
 PCD_SIZE = 50000  # The total amount of points in the point cloud
 Z_SLICE_COUNT = 50  # The amount of subsections when remeshing along the z axis
-ROTATIONAL_SLICE_COUNT = 3  # The amount of subsections when subdividing rotationally
+ROTATIONAL_SLICE_COUNT = 120  # The amount of subsections when subdividing rotationally
 SUB_PCD_PRECISION = (
     1 / 100
 )  # Factor to calculate the bounding box width compared to the total extent
@@ -135,11 +134,12 @@ def main(file_, **kwargs):
     in_mesh = in_mesh.apply_transform(to_origin)
 
     # --------------- Axisymmetrical V3 ---------------------
+    u.msg("Computing axisymmetrical coordinates", "process")
     _mesh = in_mesh
     to_origin, mesh_extents = u.axis_oriented_extents(_mesh)
     _mesh.apply_transform(to_origin)
     rad = 2 * math.pi / ROTATIONAL_SLICE_COUNT
-    point_count = 500
+    point_count = 100
     addend = mesh_extents[2] / point_count
     out = []
     for i in range(ROTATIONAL_SLICE_COUNT):
@@ -159,21 +159,21 @@ def main(file_, **kwargs):
                 continue
             # hit = np.min(hit) # The ray also intersects the back of the mesh
 
-            prev_distance = None
-            distance = starting_distance
+            top_boundary = starting_distance
+            bottom_boundary = 0
+            current_distance = starting_distance
             ray_directions = [[1, 0, 0], [-1, 0, 0]]
-            while distance > min_distance:
+            while (top_boundary - bottom_boundary) / 4 > min_distance:
                 # Shoot a perpendicular ray
-                ray_origin = [0, distance, z]
+                ray_origin = [0, current_distance, z]
                 ray_origins = [ray_origin, ray_origin]
                 hit = Intersector.intersects_any(ray_origins, ray_directions)
                 if np.any(hit):
-                    distance += 1
-                    break
+                    bottom_boundary = current_distance
                 else:
-                    distance -= 1
-                    continue
-            tmp.append(np.asarray([0, distance, z]))
+                    top_boundary = current_distance
+                current_distance = top_boundary - (top_boundary - bottom_boundary) / 2
+            tmp.append(np.asarray([0, current_distance, z]))
             z += addend
     
         # Rotate the mesh
@@ -182,103 +182,17 @@ def main(file_, **kwargs):
         for j, p in enumerate(tmp):
             tmp[j] = u.rotate_z_rad(p, rad * i)
         out.append(tmp)
-    # u.plot(np.asarray(out))
 
-    # --------------- Preview ---------------
-    concave_hulls = out
-    aligned_hulls = []
-    linear_eqs = {}
-    for arr in concave_hulls:
-        tmp = []
-        for p0 in concave_hulls[0]:
-            for i, p1 in enumerate(arr):
-                if p1[2] >= p0[2]:
-                    break
-
-            # Interpolating the z coordinate doesn't seem to be necessary for big pcd
-            new = arr[i]
-            tmp.append(np.asarray(new))
-
-            # Calculate the point's tangent's equation
-            # linear_eq = [k, d]
-            x = new[0]
-            y = new[1]
-            linear_eq = None
-            if np.isclose(x, 0):
-                linear_eq = [0, y]
-            # TODO
-            elif np.isclose(y, 0):
-                linear_eq = x
-            else:
-                # Linear equation perpendicular to normal
-                # y = kx + d
-                k = -x / y
-                d = y - k * x
-                linear_eq = [k, d]
-
-            linear_eqs[str(new)] = linear_eq
-        aligned_hulls.append(tmp)
-    
-    # Define line intersections
-    out = []
-    for i, arr in enumerate(aligned_hulls):
-        for j, p in enumerate(arr):
-            eq0 = linear_eqs[str(arr[j])]
-
-            if i < len(aligned_hulls) - 1:
-                eq1 = linear_eqs[str(aligned_hulls[i + 1][j])]
-            else:
-                eq1 = linear_eqs[str(aligned_hulls[0][j])]
-
-            if i > 0:   
-                eq2 = linear_eqs[str(aligned_hulls[i - 1][j])]
-            else:
-                eq2 = linear_eqs[str(aligned_hulls[len(aligned_hulls) - 1][j])] 
-
-            eqs = [eq1, eq2]
-            for eq in eqs:
-                # y = k1 * x + d1, y = k0 * x + d0
-                # k0 * x + d0 = k1 * x + d1
-                # k0 * x - k1 * x = d1 - d0
-                # x = (d1 - d0) / (k0 - k1)
-
-                if not isinstance(eq0, list):
-                    x = eq0
-                    y = eq[0] * x + eq[1]
-                elif not isinstance(eq, list):
-                    x = eq
-                    y = eq0[0] * x + eq0[1]
-                else:
-                    x = (eq[1] - eq0[1]) / (eq0[0] - eq[0])
-                    y = eq0[0] * x + eq0[1]
-                intersection = np.asarray([x, y, p[2]])
-
-                v = intersection - p
-                point_count = 20
-                distance = u.magnitude(v) / point_count
-                v = u.normalize(v)
-                for k in range(point_count):
-                    new = p + v * distance * k
-                    out.append(new)
-    
-    # Export to a mesh
-    out_pcd = o3d.geometry.PointCloud()
-    out_pcd.points = o3d.utility.Vector3dVector(out)
-    out_pcd = out_pcd.farthest_point_down_sample(10000)
-
-    out_pcd.estimate_normals()
-    distances = out_pcd.compute_nearest_neighbor_distance()
-    avg_dist = np.mean(distances)
-    radius = 1.5 * avg_dist
-
-    _mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(
-        out_pcd, o3d.utility.DoubleVector([radius, radius * 2])
-    )
-
-    v = np.asarray(_mesh.vertices)
-    t = np.asarray(_mesh.triangles)
-    _mesh = trimesh.Trimesh(v, t, vertex_normals=np.asarray(_mesh.vertex_normals))
-    _mesh.export(prefs.MESH_FOLDER + "sliced_mesh.stl")
+        if i + 1 < ROTATIONAL_SLICE_COUNT:
+            u.msg(f"finished {i + 1} / {ROTATIONAL_SLICE_COUNT} sections", "info", "\r")
+        else:
+            u.msg(f"finished {i + 1} / {ROTATIONAL_SLICE_COUNT} sections", "info")
+    tmp = []
+    for a in out:
+        for b in a:
+            tmp.append(b)
+    tmp = np.asarray(tmp)
+    u.plot(tmp)
 
     return 0
 

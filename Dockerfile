@@ -17,10 +17,9 @@ RUN pip install --upgrade pip
 # Install dependences
 RUN pip install --no-cache-dir -r requirements.txt
 # Dependeces for open3d
-RUN apt update && apt install -y libgomp1 libx11-6 libgl1
+RUN apt update && apt install -y libgomp1 libx11-6 libgl1 binutils libglib2.0-dev
 
-# Optionally, run a script or start a shell
-# CMD ["python", "test_pymesh.py"]
-# CMD ["/bin/bash"]
+# RUN pyinstaller --onefile --distpath ./exe/dist --workpath ./exe/build -i ./tgm.ico ./v2/main.py
 CMD ["bash", "-c", "cd /workspace/code && exec /bin/bash"]
+# CMD ["bash", "-c", "cd .."]
 

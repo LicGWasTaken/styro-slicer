@@ -22,8 +22,8 @@ def to_gcode(file_name: str, coords: list, rad: float, velocity: int):
     for i, r in enumerate(coords):
         # Move into the working area
         s = f"G1 F{velocity}\n"
-        s += f"G1 X{r[0][2] - 5 + offset} Y{bottom_approach_z(r) + offset} Z{50}\n"
-        s += f"G1 X{r[0][2] - 5 + offset} Y{bottom_approach_z(r) + offset} Z{r[0][0] + 155}\n"
+        s += f"G1 X{bottom_approach_z(r) + offset} Y{bottom_approach_z(r) + offset} Z{50}\n"
+        s += f"G1 X{bottom_approach_z(r) + offset} Y{bottom_approach_z(r) + offset} Z{r[0][0] + 155}\n"
         file.write(s)
 
         for j, p in enumerate(r):
@@ -36,8 +36,8 @@ def to_gcode(file_name: str, coords: list, rad: float, velocity: int):
             file.write(s)
 
         # Move outside of the working area
-        s = f"G1 X{p[2] + 5} Y{top_approach_z(r)} Z{p[0]}\n"
-        s += f"G1 X{p[2] + 5} Y{top_approach_z(r)} Z{50}\n"
+        s = f"G1 X{top_approach_z(r) + offset} Y{top_approach_z(r) + offset} Z{p[0]}\n"
+        s += f"G1 X{top_approach_z(r) + offset} Y{top_approach_z(r) + offset} Z{50}\n"
         s += f"G1 F{feed}\n"
         s += "G1 X10 Y10 Z50\n"
         file.write(s)
