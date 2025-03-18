@@ -3,7 +3,6 @@ import numpy as np
 import math
 
 import trimesh.bounds
-import prefs
 import trimesh
 
 import matplotlib.pyplot as plt
@@ -138,15 +137,15 @@ def minkowski(a: np.array, b: np.array):
         
     return np.asarray(out)
 
-def plot(arr: np.ndarray, color:str = "hotpink"):
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection="3d")
-    ax.set_aspect('equal', adjustable='box')
-    try:
-        ax.scatter(arr[:, 0], arr[:, 1], arr[:, 2], color=color)
-    except:
-        ax.scatter(arr[:, 0], arr[:, 1], color=color)
-    plt.savefig(prefs.MESH_FOLDER + "unnamed.png")
+# def plot(arr: np.ndarray, color:str = "hotpink"):
+#     fig = plt.figure()
+#     ax = fig.add_subplot(111, projection="3d")
+#     ax.set_aspect('equal', adjustable='box')
+#     try:
+#         ax.scatter(arr[:, 0], arr[:, 1], arr[:, 2], color=color)
+#     except:
+#         ax.scatter(arr[:, 0], arr[:, 1], color=color)
+#     plt.savefig(prefs.MESH_FOLDER + "unnamed.png")
 
 # ----------- SDFs -----------
 

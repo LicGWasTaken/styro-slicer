@@ -1,0 +1,8 @@
+trimesh[easy]
+matplotlib
+colorama
+numpy
+open3d
+concave_hull
+PyQt5
+

@@ -1,6 +1,0 @@
-PyQt5
-vtk
-trimesh
-numpy
-matplotlib
-(colorama)

@@ -3,63 +3,70 @@ import math
 import numpy as np
 import utils as u
 
+extents_ = None
+
 def main(file_):
-    in_mesh = trimesh.load_mesh(file_)
-    out = axysimmetrical(in_mesh, 20)
+    mesh_ = trimesh.load_mesh(file_)
+    out = axysimmetric(mesh_, num_cuts=20, num_points=100*20)
     return out
 
-def axysimmetrical(_mesh: trimesh.Trimesh, num_cuts: int):
-    to_origin, mesh_extents = u.axis_oriented_extents(_mesh)
-    _mesh.apply_transform(to_origin)
-    rad = 2 * math.pi / num_cuts
-    point_count = 100
-    addend = mesh_extents[2] / point_count
+def axysimmetric(mesh_: trimesh.Trimesh, num_cuts: int, num_points):
     out = []
-    for i in range(num_cuts):
-        tmp = []
-        Intersector = trimesh.ray.ray_pyembree.RayMeshIntersector(_mesh)
-        # Temporary, change this to something with extents
-        starting_distance = u.magnitude([mesh_extents[0], mesh_extents[1]])
-        min_distance = 0.5
-        z = -mesh_extents[2] / 2
-        for z_ in range(point_count):
-            # Cast a ray towards the mesh to find the minimum distance
-            ray_origin = [[0, starting_distance, z]]
-            ray_direction = [[0, -1, 0]]
-            hit, _, _ = Intersector.intersects_location(ray_origin, ray_direction)
-            if len(hit) == 0:
-                z += addend
-                continue
-            # hit = np.min(hit) # The ray also intersects the back of the mesh
 
-            top_boundary = starting_distance
-            bottom_boundary = 0
-            current_distance = starting_distance
-            ray_directions = [[1, 0, 0], [-1, 0, 0]]
-            while (top_boundary - bottom_boundary) / 4 > min_distance:
-                # Shoot a perpendicular ray
-                ray_origin = [0, current_distance, z]
-                ray_origins = [ray_origin, ray_origin]
-                hit = Intersector.intersects_any(ray_origins, ray_directions)
+    to_origin, mesh_extents = u.axis_oriented_extents(mesh_)
+    mesh = mesh_.apply_transform(to_origin)
+
+    # Cache the extents
+    extents_ = mesh_extents
+    	
+    # Variables for mesh transformation
+    rad = 2 * math.pi / num_cuts
+    num_points_per_cut = round(num_points / num_cuts)
+    add = extents_[2] / num_points_per_cut
+
+    # Variables for raycasting
+    start_dist = u.magnitude([extents_[0], extents_[1]]) * 2
+    min_dist = 0.5
+
+    Intersector = trimesh.ray.ray_pyembree.RayMeshIntersector(mesh)
+    ray_direction = [0, -1, 0]
+    ray_directions_perp = [[1, 0, 0], [-1, 0, 0]]
+    ray_origin = [0, start_dist, 0]
+
+    for i in range(num_cuts):
+        cut = []
+        z = -extents_[2] / 2 - add
+        for j in range(num_points_per_cut):
+            z += add
+
+            hit, _, _ = Intersector.intersects_location([ray_origin], [ray_direction])
+            if len(hit) == 0: continue
+
+            # Collision detection (exponential decay)
+            bound_top = start_dist
+            bound_bottom = 0
+            dist = start_dist
+
+            while (bound_top - bound_bottom) / 4 > min_dist:
+                ray_origin_perp = [0, dist, z]
+                ray_origins_perp = [ray_origin_perp, ray_origin_perp]
+                hit = Intersector.intersects_any(ray_origins_perp, ray_directions_perp)
                 if np.any(hit):
-                    bottom_boundary = current_distance
+                    bound_bottom = dist
                 else:
-                    top_boundary = current_distance
-                current_distance = top_boundary - (top_boundary - bottom_boundary) / 2
-            tmp.append(np.asarray([0, current_distance, z]))
-            z += addend
-    
+                    bound_top = dist
+                dist = bound_top - (bound_top -bound_bottom) / 2
+            cut.append(np.asarray([0, dist, z]))
+
         # Rotate the mesh
         rotation_matrix = trimesh.transformations.rotation_matrix(rad, [0, 0, 1])
-        _mesh.apply_transform(rotation_matrix)
-        for j, p in enumerate(tmp):
-            tmp[j] = u.rotate_z_rad(p, rad * i)
-        out.append(tmp)
+        mesh.apply_transform(rotation_matrix)
+        for j, p in enumerate(cut):
+            cut[j] = u.rotate_z_rad(p, rad * i)
+   
+        for p in cut:
+            out.append(p)
 
-    tmp = []
-    for a in out:
-        for b in a:
-            tmp.append(b)
-    tmp = np.asarray(tmp)
-
-    return tmp
+    out = np.asarray(out)
+    print(out.size, len(cut))
+    return out
