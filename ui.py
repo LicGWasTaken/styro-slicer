@@ -9,8 +9,6 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QFileDialog,
 import sys
 import vtk
 from vtkmodules.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
 
 from qtui import Ui_MainWindow
@@ -27,18 +25,12 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
         # Set up VTK rendering
         self.renderer = vtk.vtkRenderer()
+        self.renderer.SetBackground(1, 1, 1)
         self.w_vtk_viewer.GetRenderWindow().AddRenderer(self.renderer)
         self.iren = self.w_vtk_viewer.GetRenderWindow().GetInteractor()
         self.iren.Initialize()
 
-        # Set up MatPlotLib
-        self.mpl_layout = QVBoxLayout(self.w_mpl_plot)
-        self.figure = Figure()
-        self.canvas = FigureCanvas(self.figure)
-        self.mpl_layout.addWidget(self.canvas)
-        self.ax = self.figure.add_subplot(111, projection="3d")
-        self.canvas.draw()
-    
+        # Connect functions to buttons
         self.b_open_file.clicked.connect(self.load_file)
         self.b_slice.clicked.connect(self.compute_coordinates)
 
@@ -52,7 +44,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             print(f'Selected file: {self.file_path}')
             file_name = self.file_path.rsplit('/', 1)[1]
             self.t_selected_file.setText(file_name)
-            self.file_viewer(self.file_path)
+            # self.file_viewer(self.file_path)
+            slicer.align_mesh(self.file_path)
+            self.file_viewer("mesh.stl")
             # TODO check for valid file extension
         else:
             print('No file selected')
@@ -90,17 +84,33 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         else:
             out = slicer.main(self.file_path)
             if out.size != 0:
-                self.plot(out)
-    
-    def plot(self, arr, color:str = "hotpink"):
-        self.figure.clear()
-        self.ax = self.figure.add_subplot(111, projection="3d")
-        self.ax.set_aspect('equal', adjustable='box')
-        try:
-            self.ax.scatter(arr[:, 0], arr[:, 1], arr[:, 2], color=color)
-        except:
-            self.ax.scatter(arr[:, 0], arr[:, 1], color=color)
-        self.canvas.draw()
+                self.vtk_plot(out)
+
+    def vtk_plot(self, arr):
+        vtk_points = vtk.vtkPoints()
+        for p in arr:
+            vtk_points.InsertNextPoint(p)
+        
+        pcd_polydata = vtk.vtkPolyData()
+        pcd_polydata.SetPoints(vtk_points)
+
+        vertices = vtk.vtkCellArray()
+        for i in range(len(arr)):
+            vertices.InsertNextCell(1)
+            vertices.InsertCellPoint(i)
+        pcd_polydata.SetVerts(vertices)
+
+        pcd_mapper = vtk.vtkPolyDataMapper()
+        pcd_mapper.SetInputData(pcd_polydata)
+        
+        pcd_actor = vtk.vtkActor()
+        pcd_actor.SetMapper(pcd_mapper)
+        pcd_actor.GetProperty().SetColor(1, 0, 0)
+        pcd_actor.GetProperty().SetPointSize(5)
+        
+        self.renderer.AddActor(pcd_actor)        
+        self.w_vtk_viewer.GetRenderWindow().Render()
+
 
 if __name__ == '__main__':
     print("running...")

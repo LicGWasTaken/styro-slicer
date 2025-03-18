@@ -14,7 +14,12 @@
    <string>MainWindow</string>
   </property>
   <property name="styleSheet">
-   <string notr="true">QPushButton {
+   <string notr="true">QMainWindow {
+	background-color: white;
+	color: white;
+}
+
+QPushButton {
     background-color: grey;  /* Change to desired color */
     color: white;  /* Text color */
 }</string>
@@ -270,12 +275,9 @@
       <height>541</height>
      </rect>
     </property>
-    <layout class="QVBoxLayout" name="verticalLayout" stretch="1,1">
+    <layout class="QVBoxLayout" name="verticalLayout" stretch="1">
      <item>
       <widget class="QVTKRenderWindowInteractor" name="w_vtk_viewer" native="true"/>
-     </item>
-     <item>
-      <widget class="QWidget" name="w_mpl_plot" native="true"/>
      </item>
     </layout>
    </widget>
@@ -304,6 +306,16 @@
       </rect>
      </property>
     </widget>
+   </widget>
+   <widget class="QWidget" name="w_mpl_plot" native="true">
+    <property name="geometry">
+     <rect>
+      <x>210</x>
+      <y>450</y>
+      <width>181</width>
+      <height>131</height>
+     </rect>
+    </property>
    </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">

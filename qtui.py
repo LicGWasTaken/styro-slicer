@@ -15,7 +15,12 @@ class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
         MainWindow.resize(1123, 764)
-        MainWindow.setStyleSheet("QPushButton {\n"
+        MainWindow.setStyleSheet("QMainWindow {\n"
+"    background-color: white;\n"
+"    color: white;\n"
+"}\n"
+"\n"
+"QPushButton {\n"
 "    background-color: grey;  /* Change to desired color */\n"
 "    color: white;  /* Text color */\n"
 "}")
@@ -119,11 +124,7 @@ class Ui_MainWindow(object):
         self.w_vtk_viewer = QVTKRenderWindowInteractor(self.verticalLayoutWidget)
         self.w_vtk_viewer.setObjectName("w_vtk_viewer")
         self.verticalLayout.addWidget(self.w_vtk_viewer)
-        self.w_mpl_plot = QtWidgets.QWidget(self.verticalLayoutWidget)
-        self.w_mpl_plot.setObjectName("w_mpl_plot")
-        self.verticalLayout.addWidget(self.w_mpl_plot)
         self.verticalLayout.setStretch(0, 1)
-        self.verticalLayout.setStretch(1, 1)
         self.scrollArea = QtWidgets.QScrollArea(self.centralwidget)
         self.scrollArea.setGeometry(QtCore.QRect(90, 130, 271, 301))
         self.scrollArea.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
@@ -133,6 +134,9 @@ class Ui_MainWindow(object):
         self.scrollAreaWidgetContents.setGeometry(QtCore.QRect(0, 0, 248, 299))
         self.scrollAreaWidgetContents.setObjectName("scrollAreaWidgetContents")
         self.scrollArea.setWidget(self.scrollAreaWidgetContents)
+        self.w_mpl_plot = QtWidgets.QWidget(self.centralwidget)
+        self.w_mpl_plot.setGeometry(QtCore.QRect(210, 450, 181, 131))
+        self.w_mpl_plot.setObjectName("w_mpl_plot")
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(MainWindow)
         self.menubar.setGeometry(QtCore.QRect(0, 0, 1123, 26))
