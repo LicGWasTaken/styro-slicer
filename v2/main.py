@@ -145,7 +145,6 @@ def main(file_, **kwargs):
     for i in range(ROTATIONAL_SLICE_COUNT):
         tmp = []
         Intersector = trimesh.ray.ray_pyembree.RayMeshIntersector(_mesh)
-        # Temporary, change this to something with extents
         starting_distance = u.magnitude([mesh_extents[0], mesh_extents[1]])
         min_distance = 0.5
         z = -mesh_extents[2] / 2
