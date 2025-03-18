@@ -1,0 +1,12 @@
+docker build -t docker-env .
+
+v1
+docker run -it --rm -v $(pwd)/v1:/workspace/code -v $(pwd)/obj:/workspace/obj -v $(pwd)/plots:/workspace/plots -v $(pwd)/output:/workspace/output docker-env
+v2
+docker run -it --rm -v $(pwd)/v2:/workspace/code -v $(pwd)/obj:/workspace/obj docker-env
+
+docker image prune -f
+docker buildx prune -f
+
+python main.py Celly.stl --kwargs "{'align-part': True, 'scale-to-material': True, 'material-sizes': [[60, 70, 205]], 'selected-material-size': [60, 70, 205]}"
+
