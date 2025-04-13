@@ -94,6 +94,18 @@ def linear_parameters_2d(point: np.ndarray):
         d = y - k * x
         return k, d
 
+def extreme_points_along_vector(points: np.ndarray, vector: np.ndarray):
+    """Given a list of points and a vector, find the projected points furthest along that vector"""
+    vector = normalize(vector)
+    projections = np.dot(points, vector)
+    projected_points = (projections[:, np.newaxis] * vector)
+
+    min_index = np.argmin(projections)
+    max_index = np.argmax(projections)
+    
+    # return projected_points[min_index], projected_points[max_index]
+    return points[min_index], points[max_index]
+
 def minkowski(a: np.array, b: np.array):
     """Both arrays have to be sorted counterclockwise beginning from the bottom left angle"""
     # Calculate the minkoski sum
@@ -136,6 +148,25 @@ def minkowski(a: np.array, b: np.array):
             break
         
     return np.asarray(out)
+
+def plane(origin: np.ndarray, normal: np.ndarray):
+    A, B, C = normal
+    x, y, z = origin
+    D = A * x + B * y + C * z
+    return np.asarray([A, B, C, D])
+
+def plane_intersect(a, b):
+    a_vec, b_vec = np.array(a[:3]), np.array(b[:3])
+
+    aXb_vec = np.cross(a_vec, b_vec)
+
+    A = np.array([a_vec, b_vec, aXb_vec])
+    d = np.array([-a[3], -b[3], 0.]).reshape(3,1)
+
+    p_inter = np.linalg.solve(A, d).T
+
+    return p_inter[0], (p_inter + aXb_vec)[0]
+
 
 # def plot(arr: np.ndarray, color:str = "hotpink"):
 #     fig = plt.figure()

@@ -1,10 +1,13 @@
 import trimesh
+import gcode as gc
 import math
 import numpy as np
 import utils as u
 import vtk
 
-def main(file_):
+ORIGIN = np.asarray([387, 387, 420 + 75])
+
+def main(file_, name_):
     mesh_ = trimesh.load_mesh(file_)
 
     to_origin, mesh_extents = u.axis_oriented_extents(mesh_)
@@ -14,148 +17,92 @@ def main(file_):
     global extents_ 
     extents_ = mesh_extents
 
-    out = axysimmetric(mesh_, num_cuts=20, num_points=100*20)
-    # out = linear(mesh_)
+    out = linear(mesh_)
+    # out, coords = axysimmetric(mesh_, num_cuts=16, num_points=100*2, kerf=0.2)
+    # gc.to_gcode_axysimmetric(name_, coords, ORIGIN, np.asarray([400, 600, 1450]), feed=150, slew=800)
     return out
-
-def align_mesh(path):
-    mesh_ = trimesh.load_mesh(path)
-    to_origin, mesh_extents = u.axis_oriented_extents(mesh_)
-    mesh = mesh_.apply_transform(to_origin)
-    mesh.export("mesh.stl")
-
 
 def linear(mesh_: trimesh.Trimesh):
     out = []
 
-    mesh = convex_mesh(mesh_)
+    # Trimesh's trimesh.facets leaves out a lot of faces, so we had those back in manually
+    facets_indices = mesh_.facets.copy()
+    facet_faces = np.concatenate(facets_indices)
+    all_faces = np.arange(len(mesh_.faces.copy()))
+    missing_faces = np.setdiff1d(all_faces, facet_faces)
 
+    for f in missing_faces:
+        facets_indices.append(np.array([f]))
+
+    # Add the excluded faces to the normals
+    facets_normals = mesh_.facets_normal.copy().tolist()
+    face_normals = mesh_.face_normals.copy().tolist()
+    for f in missing_faces:
+        facets_normals.append(face_normals[f])
+    facets_normals = np.array([np.array(sublist) for sublist in facets_normals])
+
+    # Turn the indicies into unique vertices
+    facets_vertices = []
+    for arr in facets_indices:
+        vertex_indices = np.concatenate(mesh_.faces[arr])
+        facets_vertices.append(mesh_.vertices[np.unique(vertex_indices)])
+
+    # We calculate the origins with the avarage of the vertices
+    # since Trimesh's facets.origins returns a random point on the facet
+    facets_origins = np.asarray([verts.mean(axis=0) for verts in facets_vertices])
+
+    # Visualize normals
+    for i, normal in enumerate(facets_normals):
+        origin = facets_origins[i]
+        out.append(np.asarray([origin + normal, origin + normal * 2]))
+
+    # Find the longest vertical line on each facet
+    for i, facet_index in enumerate(facets_indices):
+        facet_origin = facets_origins[i]
+
+    return np.asarray(out)
+
+    # Used to store information accessible via facet index
+    normals = []   
+    planes = []
+    vectors = []
+    points = []
+    for i in range(len(facets_indices)):
+        facet_origin = facets_origins[i]
+        facet_normal = facets_normals[i]
+        facet_plane = u.plane(facet_origin, facet_normal)
+
+        # Find the longest vertical line on each facet
+        normal = np.asarray([facet_normal[0], facet_normal[1], 0])
+        normal = u.rotate_z_rad(normal, math.pi / 2)
+        if u.magnitude(normal) == 0: # Handle vertical normals
+            normal = np.asarray([1, 0, 0])
+        normal = u.normalize(normal)
+        normals.append(normal)
+        cut_plane = u.plane(np.asarray([0, 0, 0]), normal)
+        planes.append(np.asarray(cut_plane))
+
+        intersection = u.plane_intersect(facet_plane, cut_plane)
+        vector = u.normalize(intersection[1] - intersection[0])
+        vectors.append(vector)
+
+        min_, max_ = u.extreme_points_along_vector(facets_vertices[i], vector)
+        points.append(np.asarray([min_, max_]))
+
+        # TODO: Collision detection
+
+        # out.append(min_)
+        # out.append(max_)
+        out.append(np.asarray([min_, max_]))
+
+    out = np.asarray(out)
+    # print(planes, normals, vectors, points)
+    print(out)
     return out
 
-def convex_mesh(mesh_: trimesh.Trimesh, num_sub_pcds):
-    # Subdivide the mesh into submeshes along the z axis and compute their convex hulls
-    convex_sub_meshes = [[] for _ in range(num_sub_pcds)]
-    for i in range(num_sub_pcds):
-        # Slice from below
-        plane_origin = [0, 0, (extents_[2] / num_sub_pcds) * i * 0.999]
-        tmp = trimesh.intersections.slice_mesh_plane(
-            mesh_, plane_normal=[0, 0, 1], plane_origin=plane_origin
-        )
-
-        # Slice from above
-        plane_origin = [0, 0, (extents_[2] / num_sub_pcds) * (i + 1) * 1.001]
-        tmp = trimesh.intersections.slice_mesh_plane(
-            tmp, plane_normal=[0, 0, -1], plane_origin=plane_origin
-        )
-
-        # Remove top and bottom of convex hull
-        tmp = tmp.convex_hull
-        if i > 0:
-            plane_origin = [0, 0, (extents_[2] / num_sub_pcds) * i]
-            tmp = trimesh.intersections.slice_mesh_plane(
-                tmp, plane_normal=[0, 0, 1], plane_origin=plane_origin
-            )
-        if i < num_sub_pcds - 1:
-            plane_origin = [0, 0, (extents_[2] / num_sub_pcds) * (i + 1)]
-            tmp = trimesh.intersections.slice_mesh_plane(
-                tmp, plane_normal=[0, 0, -1], plane_origin=plane_origin
-            )
-
-        convex_sub_meshes[i] = tmp
-
-    # Sample pcds and merge them
-    append_filter = vtk.vtkAppendPolyData()
-
-    for sub_mesh in convex_sub_meshes:
-        sampler = vtk.vtkPolyDataPointSampler()
-        sampler.SetInputData(mesh)
-        sampler.SetDistance(1)  # Adjust sampling density
-        sampler.Update()
-        sub_pcd = sampler.GetOutput()
-
-        append_filter.AddInputData(sub_pcd)
-
-    append_filter.Update()
-    pcd = append_filter.GetOutput()
-    
-        
-
-    # # Scale the number of points with the extents to get a more even distribution
-    # volumes = []
-    # sum = 0
-    # for i, mesh in enumerate(convex_slices):
-    #     mesh_to_origin, mesh_extents = u.axis_oriented_extents(mesh)
-    #     volume = mesh_extents[0] * mesh_extents[1] * mesh_extents[2]
-    #     volumes.append(volume)
-    #     sum += volume
-
-    # sub_pcd_sizes = []
-    # for i, v in enumerate(volumes):
-    #     size = math.ceil(PCD_SIZE * v / sum)
-
-    #     # Manually increase the value for the top and bottom slice
-    #     # to account for the increase in surface area
-    #     if i < 1 or i >= len(volumes) - 1:
-    #         size *= 5
-    #     sub_pcd_sizes.append(size)
-    # u.msg(f"calculated pcd sizes", "info")
-
-    for i, mesh in enumerate(convex_sub_meshes):
-        # Covert the mesh from trimesh to o3d
-        o3d_mesh = o3d.geometry.TriangleMesh()
-        o3d_mesh.vertices = o3d.utility.Vector3dVector(convex_sub_meshes[i].vertices)
-        # astype(np.int32) avoids a segmentation fault
-        o3d_mesh.triangles = o3d.utility.Vector3iVector(
-            convex_sub_meshes[i].faces.astype(np.int32)
-        )
-
-        # Sample a point cloud from the mesh
-        o3d_mesh.compute_vertex_normals()
-        sub_pcd = o3d_mesh.sample_points_poisson_disk(
-            number_of_points=sub_pcd_sizes[i], init_factor=5
-        )
-        pcd += sub_pcd
-
-        if i + 1 < Z_SLICE_COUNT:
-            u.msg(f"finished {i + 1} sub-pointclouds", "info", "\r")
-        else:
-            u.msg(f"finished {i + 1} sub-pointclouds", "info")
-
-    # --------------- Remesh ---------------
-    pcd.estimate_normals()
-
-    # Add kerf to pcd
-    if "kerf" in kwargs.keys():
-        kerf = kwargs["kerf"]
-        for i, p in enumerate(pcd.points):
-            pcd.points[i] = p + pcd.normals[i] * kerf
-        u.msg("added kerf", "info")
-
-    # Estimate radius for rolling ball
-    distances = pcd.compute_nearest_neighbor_distance()
-    avg_dist = np.mean(distances)
-    radius = 1.5 * avg_dist
-
-    convex_mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(
-        pcd, o3d.utility.DoubleVector([radius, radius * 2])
-    )
-
-    # Create the triangular mesh with the vertices and faces from open3d
-    v = np.asarray(convex_mesh.vertices)
-    t = np.asarray(convex_mesh.triangles)
-    _mesh = trimesh.Trimesh(v, t, vertex_normals=np.asarray(convex_mesh.vertex_normals))
-    to_origin, _ = u.axis_oriented_extents(_mesh)
-    _mesh.apply_transform(to_origin)
-    _mesh.export(prefs.MESH_FOLDER + "convex_mesh.stl")
-
-    # Update mesh extents
-    extents += 2 * kerf
-    convex_mesh.translate([kerf, kerf, kerf])
-
-    pass
-
-def axysimmetric(mesh_: trimesh.Trimesh, num_cuts: int, num_points):
-    out = []
+def axysimmetric(mesh_: trimesh.Trimesh, num_cuts: int, num_points: int, kerf: float):
+    pcd = []
+    coords = []
     mesh = mesh_
 
     # Variables for mesh transformation
@@ -165,12 +112,11 @@ def axysimmetric(mesh_: trimesh.Trimesh, num_cuts: int, num_points):
 
     # Variables for raycasting
     start_dist = u.magnitude([extents_[0], extents_[1]]) * 2
-    min_dist = 0.5
+    min_dist = kerf
 
     Intersector = trimesh.ray.ray_pyembree.RayMeshIntersector(mesh)
     ray_direction = [0, -1, 0]
     ray_directions_perp = [[1, 0, 0], [-1, 0, 0]]
-    ray_origin = [0, start_dist, 0]
 
     for i in range(num_cuts):
         cut = []
@@ -178,13 +124,26 @@ def axysimmetric(mesh_: trimesh.Trimesh, num_cuts: int, num_points):
         for j in range(num_points_per_cut):
             z += add
 
+            ray_origin = [0, start_dist, z]
             hit, _, _ = Intersector.intersects_location([ray_origin], [ray_direction])
             if len(hit) == 0: continue
+
+            # Return the raycast result if no collision
+            # The raycast intersects the mesh at two points
+            closest_hit = hit[np.argmax(hit[:, 1])]
+            
+            # Add the kerf
+            closest_hit[1] += kerf
+            ray_origins_perp = [closest_hit, closest_hit]
+            hit = Intersector.intersects_any(ray_origins_perp, ray_directions_perp)
+            if not np.any(hit):
+                cut.append(np.asarray(closest_hit))
+                continue
 
             # Collision detection (exponential decay)
             bound_top = start_dist
             bound_bottom = 0
-            dist = start_dist
+            dist = closest_hit[1]
 
             while (bound_top - bound_bottom) / 4 > min_dist:
                 ray_origin_perp = [0, dist, z]
@@ -194,17 +153,19 @@ def axysimmetric(mesh_: trimesh.Trimesh, num_cuts: int, num_points):
                     bound_bottom = dist
                 else:
                     bound_top = dist
-                dist = bound_top - (bound_top -bound_bottom) / 2
+                dist = bound_top - (bound_top - bound_bottom) / 2
+
             cut.append(np.asarray([0, dist, z]))
+        deg = i * rad * 180 / math.pi
+        coords.append([deg, np.asarray(cut)])
 
         # Rotate the mesh
         rotation_matrix = trimesh.transformations.rotation_matrix(rad, [0, 0, 1])
         mesh.apply_transform(rotation_matrix)
         for j, p in enumerate(cut):
-            cut[j] = u.rotate_z_rad(p, rad * i)
+            cut[j] = u.rotate_z_rad(p, -rad * i)
    
         for p in cut:
-            out.append(p)
-
-    out = np.asarray(out)
-    return out
+            pcd.append(p)
+    pcd = np.asarray(pcd)
+    return pcd, coords

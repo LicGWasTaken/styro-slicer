@@ -4,16 +4,16 @@ print('Programm startet!')
 import locale
 locale.setlocale(locale.LC_NUMERIC, '')
 
+import trimesh
 from PyQt5 import QtWidgets, uic
 from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QFileDialog, QVBoxLayout, QWidget
 import sys
 import vtk
 from vtkmodules.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
 
-
 from qtui import Ui_MainWindow
-
 import slicer
+import utils as u
 
 class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def __init__(self):
@@ -29,88 +29,142 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.w_vtk_viewer.GetRenderWindow().AddRenderer(self.renderer)
         self.iren = self.w_vtk_viewer.GetRenderWindow().GetInteractor()
         self.iren.Initialize()
-
+        
         # Connect functions to buttons
         self.b_open_file.clicked.connect(self.load_file)
         self.b_slice.clicked.connect(self.compute_coordinates)
 
     file_path = None
+    file_name = None
+    active_actors = {}
 
     def load_file(self):
-         # Open a file dialog and get the file path
         self.file_path, _ = QFileDialog.getOpenFileName(self, 'Open File', '', 'All Files (*)')
         
-        if self.file_path:
-            print(f'Selected file: {self.file_path}')
-            file_name = self.file_path.rsplit('/', 1)[1]
-            self.t_selected_file.setText(file_name)
-            # self.file_viewer(self.file_path)
-            slicer.align_mesh(self.file_path)
-            self.file_viewer("mesh.stl")
-            # TODO check for valid file extension
-        else:
+        if not self.file_path:
             print('No file selected')
             self.t_selected_file.setText("None")
-
-    def file_viewer(self, file_):
-        reader = vtk.vtkSTLReader()
-        reader.SetFileName(file_)
-
-        mapper = vtk.vtkPolyDataMapper()
-        mapper.SetInputConnection(reader.GetOutputPort())
-
-        actor = vtk.vtkActor()
-        actor.SetMapper(mapper)
-
-        self.renderer.RemoveAllViewProps()
-        self.renderer.AddActor(actor)
-        self.renderer.ResetCamera()
-
-        # Display colorcoded scaled axes above the mesh
-        self.axes_actor = vtk.vtkAxesActor()
-        self.axes_actor.GetXAxisCaptionActor2D().GetCaptionTextProperty().SetColor(1.0, 0.0, 0.0)  # Red X
-        self.axes_actor.GetYAxisCaptionActor2D().GetCaptionTextProperty().SetColor(0.0, 1.0, 0.0)  # Green Y
-        self.axes_actor.GetZAxisCaptionActor2D().GetCaptionTextProperty().SetColor(0.0, 0.0, 1.0)  # Blue Z
-        bounds = actor.GetBounds()
-        self.axes_actor.SetTotalLength(bounds[1] - bounds[0], bounds[3] - bounds[2], bounds[5] - bounds[4])
-        self.renderer.AddActor(self.axes_actor)
-
-        self.w_vtk_viewer.GetRenderWindow().Render()
+        else:
+            print(f'Selected file: {self.file_path}')
+            self.file_name = self.file_path.rsplit('/', 1)[1]
+            self.t_selected_file.setText(self.file_name)
+            self.render_stl(self.file_path)
+            # TODO check for valid file extension
 
     def compute_coordinates(self):
         if self.file_path is None:
             print("No File Path")
             #TODO show this in UI, maybe highlight button
         else:
-            out = slicer.main(self.file_path)
+            out = slicer.main(self.file_path, self.file_name)
             if out.size != 0:
-                self.vtk_plot(out)
+                # self.render_pcd(out)
+                self.render_lcd(out)
 
-    def vtk_plot(self, arr):
+    def render_actor(self, tag, actor: vtk.vtkActor):
+        # Colored axes
+        self.axes = vtk.vtkAxesActor()
+        bounds = actor.GetBounds()
+        self.axes.SetTotalLength(bounds[1] - bounds[0], bounds[3] - bounds[2], bounds[5] - bounds[4])
+        self.axes.GetXAxisCaptionActor2D().GetCaptionTextProperty().SetColor(1, 0, 0)
+        self.axes.GetYAxisCaptionActor2D().GetCaptionTextProperty().SetColor(0, 1, 0)
+        self.axes.GetZAxisCaptionActor2D().GetCaptionTextProperty().SetColor(0, 0, 1)
+        if "axes" in self.active_actors:
+            self.renderer.RemoveActor(self.active_actors["axes"])
+        self.renderer.AddActor(self.axes)
+        self.active_actors["axes"] = self.axes
+
+        # Passed actor argument
+        if tag in self.active_actors:
+            self.renderer.RemoveActor(self.active_actors[tag])
+        self.renderer.AddActor(actor)
+        self.active_actors[tag] = actor
+
+        # Render
+        self.renderer.ResetCamera()
+        self.w_vtk_viewer.GetRenderWindow().Render()
+
+    def render_stl(self, file_):
+        reader = vtk.vtkSTLReader()
+        reader.SetFileName(file_)
+
+        # Translate the mesh to the world origin
+        mesh = trimesh.load_mesh(file_)
+        to_origin, extents = u.axis_oriented_extents(mesh)
+        vtk_matrix = vtk.vtkMatrix4x4()
+        for i in range(4):
+            for j in range(4):
+                vtk_matrix.SetElement(i, j, to_origin[i, j])
+
+        transform = vtk.vtkTransform()
+        transform.SetMatrix(vtk_matrix)
+
+        transform_filter = vtk.vtkTransformPolyDataFilter()
+        transform_filter.SetInputConnection(reader.GetOutputPort())
+        transform_filter.SetTransform(transform)
+        transform_filter.Update()
+
+        # Render
+        mapper = vtk.vtkPolyDataMapper()
+        mapper.SetInputData(transform_filter.GetOutput())
+
+        actor = vtk.vtkActor()
+        actor.SetMapper(mapper)
+
+        self.render_actor("mesh", actor)
+
+    def render_pcd(self, arr):
         vtk_points = vtk.vtkPoints()
         for p in arr:
             vtk_points.InsertNextPoint(p)
         
-        pcd_polydata = vtk.vtkPolyData()
-        pcd_polydata.SetPoints(vtk_points)
+        polydata = vtk.vtkPolyData()
+        polydata.SetPoints(vtk_points)
 
         vertices = vtk.vtkCellArray()
         for i in range(len(arr)):
             vertices.InsertNextCell(1)
             vertices.InsertCellPoint(i)
-        pcd_polydata.SetVerts(vertices)
+        polydata.SetVerts(vertices)
 
-        pcd_mapper = vtk.vtkPolyDataMapper()
-        pcd_mapper.SetInputData(pcd_polydata)
+        mapper = vtk.vtkPolyDataMapper()
+        mapper.SetInputData(polydata)
         
-        pcd_actor = vtk.vtkActor()
-        pcd_actor.SetMapper(pcd_mapper)
-        pcd_actor.GetProperty().SetColor(1, 0, 0)
-        pcd_actor.GetProperty().SetPointSize(5)
-        
-        self.renderer.AddActor(pcd_actor)        
-        self.w_vtk_viewer.GetRenderWindow().Render()
+        actor = vtk.vtkActor()
+        actor.SetMapper(mapper)
+        actor.GetProperty().SetColor(1, 0, 0)
+        actor.GetProperty().SetPointSize(5)
 
+        self.render_actor("pcd", actor)
+    
+    def render_lcd(self, arr):
+        vtk_points = vtk.vtkPoints()
+        lines = vtk.vtkCellArray()
+
+        for line_points in arr:
+            point1, point2 = line_points
+            point_id1 = vtk_points.InsertNextPoint(point1)
+            point_id2 = vtk_points.InsertNextPoint(point2)
+
+            line = vtk.vtkLine()
+            line.GetPointIds().SetId(0, point_id1)
+            line.GetPointIds().SetId(1, point_id2)
+
+            lines.InsertNextCell(line)
+
+        polydata = vtk.vtkPolyData()
+        polydata.SetPoints(vtk_points)
+        polydata.SetLines(lines)
+
+        mapper = vtk.vtkPolyDataMapper()
+        mapper.SetInputData(polydata)
+
+        actor = vtk.vtkActor()
+        actor.SetMapper(mapper)
+        actor.GetProperty().SetColor(1, 0, 0)
+        actor.GetProperty().SetLineWidth(3)
+
+        self.render_actor("lines", actor)
 
 if __name__ == '__main__':
     print("running...")

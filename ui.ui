@@ -307,14 +307,23 @@ QPushButton {
      </property>
     </widget>
    </widget>
-   <widget class="QWidget" name="w_mpl_plot" native="true">
+   <widget class="QLabel" name="t_console">
     <property name="geometry">
      <rect>
-      <x>210</x>
-      <y>450</y>
-      <width>181</width>
-      <height>131</height>
+      <x>60</x>
+      <y>490</y>
+      <width>301</width>
+      <height>51</height>
      </rect>
+    </property>
+    <property name="frameShape">
+     <enum>QFrame::Panel</enum>
+    </property>
+    <property name="text">
+     <string>TextLabel</string>
+    </property>
+    <property name="wordWrap">
+     <bool>false</bool>
     </property>
    </widget>
   </widget>
