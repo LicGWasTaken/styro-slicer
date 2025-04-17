@@ -61,6 +61,37 @@ def rotate_z_rad(point: np.ndarray, rad: float):
         ])
     return p
 
+def rotate_around_vector(point: np.ndarray, axis: np.ndarray, rad: float):
+    # Ensure inputs are numpy arrays
+    point = np.asarray(point, dtype=float)
+    axis = np.asarray(axis, dtype=float)
+
+    # Normalize the axis vector
+    axis = normalize(axis)
+
+    # Compute components of Rodrigues' rotation formula
+    cos_theta = np.cos(rad)
+    sin_theta = np.sin(rad)
+    one_minus_cos = 1 - cos_theta
+
+    # Outer product of axis with itself
+    outer = np.outer(axis, axis)
+
+    # Skew-symmetric cross-product matrix of axis
+    cross = np.array([
+        [0, -axis[2], axis[1]],
+        [axis[2], 0, -axis[0]],
+        [-axis[1], axis[0], 0]
+    ])
+
+    # Rotation matrix using Rodrigues' formula
+    R = cos_theta * np.eye(3) + sin_theta * cross + one_minus_cos * outer
+
+    # Apply rotation
+    rotated_point = R @ point
+
+    return rotated_point
+
 def magnitude(v):
     try:
         return math.sqrt(v[0]**2 + v[1]**2 + v[2]**2)
@@ -94,17 +125,17 @@ def linear_parameters_2d(point: np.ndarray):
         d = y - k * x
         return k, d
 
-def extreme_points_along_vector(points: np.ndarray, vector: np.ndarray):
+def extreme_points_along_vector(points: np.ndarray, vector: np.ndarray, origin: np.ndarray):
     """Given a list of points and a vector, find the projected points furthest along that vector"""
     vector = normalize(vector)
-    projections = np.dot(points, vector)
+    offset_points = points - origin
+    projections = np.dot(offset_points, vector)
     projected_points = (projections[:, np.newaxis] * vector)
 
     min_index = np.argmin(projections)
     max_index = np.argmax(projections)
-    
-    # return projected_points[min_index], projected_points[max_index]
-    return points[min_index], points[max_index]
+
+    return origin + projected_points[min_index], origin + projected_points[max_index]
 
 def minkowski(a: np.array, b: np.array):
     """Both arrays have to be sorted counterclockwise beginning from the bottom left angle"""
@@ -165,7 +196,25 @@ def plane_intersect(a, b):
 
     p_inter = np.linalg.solve(A, d).T
 
-    return p_inter[0], (p_inter + aXb_vec)[0]
+    # return p_inter[0], (p_inter + aXb_vec)[0]
+    return p_inter[0] - (p_inter + aXb_vec)[0]
+
+def plane_vector_intersect(origin, vector, plane):
+    """vector line is infinite in both directions"""
+    a, b, c, d = plane
+    x0, y0, z0 = origin
+    dx, dy, dz = vector
+
+    numerator = -(a * x0 + b * y0 + c * z0 + d)
+    denominator = a * dx + b * dy + c * dz
+
+    if np.isclose(denominator, 0):
+        # The line is parallel to the plane (no intersection or lies entirely in it)
+        return None
+
+    t = numerator / denominator
+    intersection = origin + t * vector
+    return intersection
 
 
 # def plot(arr: np.ndarray, color:str = "hotpink"):

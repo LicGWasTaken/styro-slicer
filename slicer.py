@@ -17,13 +17,64 @@ def main(file_, name_):
     global extents_ 
     extents_ = mesh_extents
 
-    out = linear(mesh_)
+    motor_plane_data = np.asarray([387, 380, -390, 1200, -400])
+    out = linear(mesh_, motor_plane_data, kerf=0.2)
     # out, coords = axysimmetric(mesh_, num_cuts=16, num_points=100*2, kerf=0.2)
     # gc.to_gcode_axysimmetric(name_, coords, ORIGIN, np.asarray([400, 600, 1450]), feed=150, slew=800)
     return out
 
-def linear(mesh_: trimesh.Trimesh):
+def check_cut_validity_vertical_angle(plane_cuts: list, motor_planes, motor_plane_data):
+    for i, (cut, ray_direction) in enumerate(plane_cuts):
+        intersections = []
+        intersections.append(u.plane_vector_intersect(cut[0], ray_direction, motor_planes[0]))
+        intersections.append(u.plane_vector_intersect(cut[1], ray_direction, motor_planes[0]))
+        intersections.append(u.plane_vector_intersect(cut[0], ray_direction, motor_planes[1]))
+        intersections.append(u.plane_vector_intersect(cut[1], ray_direction, motor_planes[1]))
+
+        valid = True
+        for intersect in intersections:
+            if (
+                intersect[1] >= motor_plane_data[1] or
+                intersect[1] <= motor_plane_data[2] or
+                intersect[2] >= motor_plane_data[3] or 
+                intersect[2] <= motor_plane_data[4]
+            ):
+                valid = False
+                break
+        
+        if valid:
+            return i
+        
+    return None
+    
+def linear(mesh_: trimesh.Trimesh, motor_plane_data: np.ndarray, kerf: float):
+    """motor_plane_data: array containing the following information:
+    [x, positive y, negative y, positive z, negative z]
+    where each value is relative to the mesh's origin, x defines position, y and z define size"""
+
     out = []
+    Intersector = trimesh.ray.ray_pyembree.RayMeshIntersector(mesh_)
+    motor_planes_origins = [np.asarray([motor_plane_data[0], 0, 0]), np.asarray([-motor_plane_data[0], 0, 0])]
+    motor_planes_normals = [np.asarray([-1, 0, 0]), np.asarray([1, 0, 0])]
+    motor_planes = [u.plane(motor_planes_origins[0], motor_planes_normals[0]), u.plane(motor_planes_origins[1], motor_planes_normals[1])]
+
+    # Visualize plane boundaries
+    out = [[[-motor_plane_data[0], motor_plane_data[1], motor_plane_data[3]], 
+        [-motor_plane_data[0], motor_plane_data[1], motor_plane_data[4]]],
+        [[-motor_plane_data[0], motor_plane_data[1], motor_plane_data[4]], 
+        [-motor_plane_data[0], motor_plane_data[2], motor_plane_data[4]]],
+        [[-motor_plane_data[0], motor_plane_data[2], motor_plane_data[4]], 
+        [-motor_plane_data[0], motor_plane_data[2], motor_plane_data[3]]],
+        [[-motor_plane_data[0], motor_plane_data[2], motor_plane_data[3]], 
+        [-motor_plane_data[0], motor_plane_data[1], motor_plane_data[3]]], # Left Plane
+        [[motor_plane_data[0], motor_plane_data[1], motor_plane_data[3]], 
+        [motor_plane_data[0], motor_plane_data[1], motor_plane_data[4]]],
+        [[motor_plane_data[0], motor_plane_data[1], motor_plane_data[4]], 
+        [motor_plane_data[0], motor_plane_data[2], motor_plane_data[4]]],
+        [[motor_plane_data[0], motor_plane_data[2], motor_plane_data[4]], 
+        [motor_plane_data[0], motor_plane_data[2], motor_plane_data[3]]],
+        [[motor_plane_data[0], motor_plane_data[2], motor_plane_data[3]], 
+        [motor_plane_data[0], motor_plane_data[1], motor_plane_data[3]]]] # Right Plane
 
     # Trimesh's trimesh.facets leaves out a lot of faces, so we had those back in manually
     facets_indices = mesh_.facets.copy()
@@ -51,54 +102,74 @@ def linear(mesh_: trimesh.Trimesh):
     # since Trimesh's facets.origins returns a random point on the facet
     facets_origins = np.asarray([verts.mean(axis=0) for verts in facets_vertices])
 
-    # Visualize normals
-    for i, normal in enumerate(facets_normals):
-        origin = facets_origins[i]
-        out.append(np.asarray([origin + normal, origin + normal * 2]))
+    # # Visualize normals
+    # for i, normal in enumerate(facets_normals):
+    #     origin = facets_origins[i]
+    #     out.append(np.asarray([origin + normal, origin + normal * 2]))
 
-    # Find the longest vertical line on each facet
+    valid_cuts = []
     for i, facet_index in enumerate(facets_indices):
-        facet_origin = facets_origins[i]
-
-    return np.asarray(out)
-
-    # Used to store information accessible via facet index
-    normals = []   
-    planes = []
-    vectors = []
-    points = []
-    for i in range(len(facets_indices)):
+        # Find the longest vertical line on each facet
         facet_origin = facets_origins[i]
         facet_normal = facets_normals[i]
         facet_plane = u.plane(facet_origin, facet_normal)
+        facet_vertices = facets_vertices[i]
 
-        # Find the longest vertical line on each facet
-        normal = np.asarray([facet_normal[0], facet_normal[1], 0])
-        normal = u.rotate_z_rad(normal, math.pi / 2)
-        if u.magnitude(normal) == 0: # Handle vertical normals
-            normal = np.asarray([1, 0, 0])
-        normal = u.normalize(normal)
-        normals.append(normal)
-        cut_plane = u.plane(np.asarray([0, 0, 0]), normal)
-        planes.append(np.asarray(cut_plane))
+        cut_plane_normal = np.cross(facet_normal, np.asarray([0, 0, 1]))
+        if np.all(cut_plane_normal == 0):
+            cut_plane_normal = np.asarray([1, 0, 0])
+        cut_plane = u.plane(np.asarray([0, 0, 0]), cut_plane_normal)
 
-        intersection = u.plane_intersect(facet_plane, cut_plane)
-        vector = u.normalize(intersection[1] - intersection[0])
-        vectors.append(vector)
+        intersection_vector = u.plane_intersect(facet_plane, cut_plane)
+        extremes = u.extreme_points_along_vector(facet_vertices, intersection_vector, facet_origin)
+        extremes += facet_normal * kerf
 
-        min_, max_ = u.extreme_points_along_vector(facets_vertices[i], vector)
-        points.append(np.asarray([min_, max_]))
+        # Detect collisions with perpendicular raycasts
+        offset_rad = math.pi / 16
+        rad = 0
+        ray_origins = [extremes[0], extremes[0], extremes[1], extremes[1]]
+        ray_direction = np.cross(intersection_vector, facet_normal)
+        extremes_vector = intersection_vector
 
-        # TODO: Collision detection
+        valid_plane_cuts = []
+        while rad < math.pi:
+            ray_directions = [ray_direction, -ray_direction, ray_direction, -ray_direction]
+            hit = Intersector.intersects_any(ray_origins, ray_directions)
+            if not np.any(hit):
+                valid_plane_cuts.append([extremes, ray_direction])
+                
+            rad += offset_rad
+            ray_direction = u.rotate_around_vector(ray_direction, facet_normal, offset_rad)
+            extremes_vector = u.rotate_around_vector(extremes_vector, facet_normal, offset_rad)
+            extremes = u.extreme_points_along_vector(facet_vertices, extremes_vector, facet_origin)
+            extremes += facet_normal * kerf
+            ray_origins = [extremes[0], extremes[0], extremes[1], extremes[1]]
 
-        # out.append(min_)
-        # out.append(max_)
-        out.append(np.asarray([min_, max_]))
+        # TODO Add the process from axisymmetric slicing to approximate invalid cuts
 
-    out = np.asarray(out)
-    # print(planes, normals, vectors, points)
-    print(out)
-    return out
+        # Make sure the cut is valid within machine boundaries
+        rad = 0
+        offset_rad = math.pi / 6
+        cuts = valid_plane_cuts
+        while rad <= math.pi / 2:
+            valid_idx = check_cut_validity_vertical_angle(cuts, motor_planes, motor_plane_data)
+            if valid_idx is not None:
+                valid_cut = cuts[valid_idx]
+                valid_cuts.append([valid_cut, rad])
+                break
+            else:
+                # Try again with rotations around the vertical axis
+                cuts = []
+                for cut, ray_direction in valid_plane_cuts:
+                    new_dir = u.rotate_z_rad(ray_direction, offset_rad)
+                    new_cut = np.asarray([u.rotate_z_rad(cut[0], offset_rad), u.rotate_z_rad(cut[1], offset_rad)])
+                    cuts.append([new_cut, new_dir])
+                rad += offset_rad  
+
+    for cut, rad in valid_cuts:
+        if rad == 0:
+            out.append(cut[0])
+    return np.asarray(out)
 
 def axysimmetric(mesh_: trimesh.Trimesh, num_cuts: int, num_points: int, kerf: float):
     pcd = []

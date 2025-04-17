@@ -47,3 +47,10 @@
         # Once one point is selected, automatically append the other end of the cut
 # Forseeable issues with movement between points cutting into the mesh
 
+# NEW
+# Try each angle around the plane's normal with collision detection
+# Store each valid cut
+# Check which angles lie within the machine's boundaries with 0deg rotation
+# If a valid angle is found, save it and continue
+# Otherwise retry the process with rotational steps (like 5 to 10 deg)
+# If no valid cut can be achieved, store that information too (and color the meshe's plane in)
