@@ -5,7 +5,9 @@ import numpy as np
 import utils as u
 import vtk
 
-ORIGIN = np.asarray([387, 387, 420 + 75])
+ORIGIN = np.asarray([444.5, 444.5, 400 + 450])
+# MATERIAL_SIZE = np.asarray([400, 600, 1450])
+MATERIAL_SIZE = np.asarray([280, 230, 800]) # Max höhe 1150, Min höhe 390
 
 def main(file_, name_):
     mesh_ = trimesh.load_mesh(file_)
@@ -13,14 +15,19 @@ def main(file_, name_):
     to_origin, mesh_extents = u.axis_oriented_extents(mesh_)
     mesh_.apply_transform(to_origin)
 
-    # Cache the extents
-    global extents_ 
-    extents_ = mesh_extents
+    # TODO error a sliced screw rotated by pi was cut with a left thread (practically mirrored)
+    # rad = math.pi
+    # matrix = trimesh.transformations.rotation_matrix(rad, [1, 0, 0], mesh_.centroid)
+    # mesh_ = mesh_.apply_transform(matrix)
+
+    # # Cache the extents
+    # global extents_ 
+    # extents_ = mesh_extents
 
     motor_plane_data = np.asarray([387, 380, -390, 1200, -400])
-    out = linear(mesh_, motor_plane_data, kerf=0.2)
-    # out, coords = axysimmetric(mesh_, num_cuts=16, num_points=100*2, kerf=0.2)
-    # gc.to_gcode_axysimmetric(name_, coords, ORIGIN, np.asarray([400, 600, 1450]), feed=150, slew=800)
+    # out = linear(mesh_, motor_plane_data, kerf=0.2)
+    out, coords = axysimmetric(mesh_, num_cuts=18, num_points=600*18, kerf=0.01)
+    gc.to_gcode_axysimmetric(name_, coords, ORIGIN, MATERIAL_SIZE, feed=200, slew=400)
     return out
 
 def check_cut_validity_vertical_angle(plane_cuts: list, motor_planes, motor_plane_data):
@@ -51,6 +58,7 @@ def linear(mesh_: trimesh.Trimesh, motor_plane_data: np.ndarray, kerf: float):
     """motor_plane_data: array containing the following information:
     [x, positive y, negative y, positive z, negative z]
     where each value is relative to the mesh's origin, x defines position, y and z define size"""
+    # TODO make this an offset from the very bottom instead of the mesh's origin, to not depend on mesh size
 
     out = []
     Intersector = trimesh.ray.ray_pyembree.RayMeshIntersector(mesh_)
@@ -109,6 +117,8 @@ def linear(mesh_: trimesh.Trimesh, motor_plane_data: np.ndarray, kerf: float):
 
     valid_cuts = []
     for i, facet_index in enumerate(facets_indices):
+        if i % 10000 == 0:
+            print(f"facet {i}\r")
         # Find the longest vertical line on each facet
         facet_origin = facets_origins[i]
         facet_normal = facets_normals[i]
@@ -131,6 +141,8 @@ def linear(mesh_: trimesh.Trimesh, motor_plane_data: np.ndarray, kerf: float):
         ray_direction = np.cross(intersection_vector, facet_normal)
         extremes_vector = intersection_vector
 
+        # TODO add an extra raycast to make sure that no extremes collide with the mesh
+        # If they do, add the "imperfect raycast" and prioritize other cuts in later sections
         valid_plane_cuts = []
         while rad < math.pi:
             ray_directions = [ray_direction, -ray_direction, ray_direction, -ray_direction]
@@ -169,12 +181,14 @@ def linear(mesh_: trimesh.Trimesh, motor_plane_data: np.ndarray, kerf: float):
     for cut, rad in valid_cuts:
         if rad == 0:
             out.append(cut[0])
+    print(len(out))
     return np.asarray(out)
 
 def axysimmetric(mesh_: trimesh.Trimesh, num_cuts: int, num_points: int, kerf: float):
     pcd = []
     coords = []
     mesh = mesh_
+    _, extents_ = u.axis_oriented_extents(mesh)
 
     # Variables for mesh transformation
     rad = 2 * math.pi / num_cuts
@@ -184,6 +198,9 @@ def axysimmetric(mesh_: trimesh.Trimesh, num_cuts: int, num_points: int, kerf: f
     # Variables for raycasting
     start_dist = u.magnitude([extents_[0], extents_[1]]) * 2
     min_dist = kerf
+    if min_dist == 0:
+        min_dist = 0.01
+        # TODO send a warning about this inprecision
 
     Intersector = trimesh.ray.ray_pyembree.RayMeshIntersector(mesh)
     ray_direction = [0, -1, 0]

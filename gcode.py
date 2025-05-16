@@ -3,11 +3,12 @@ import math
 import time
 import utils as u
 
-scale = 2
+# TODO currently scales the gcode which leads to incorrect kerfs
+# TODO add an alternative that cuts in alternating directions
+scale = 1
 decimals = 3
 material_offset = 20
-#M42 P0 S1 / M42 P0 S0
-# TODO: Add a factor to convert machine units into mm and viceversa (e.g. for block detection)
+
 def to_gcode_axysimmetric(file_name, arr: list, origin: np.ndarray, material_size: np.ndarray, feed: float, slew: float):
     """axysimmetric: absolute
     E,X,Y,Z --> Z, -, (X, U), (Y, V)"""
@@ -31,6 +32,10 @@ def to_gcode_axysimmetric(file_name, arr: list, origin: np.ndarray, material_siz
     for i, (angle, points) in enumerate(arr):
         # Rotation
         s = f"G1 F{slew} Z{angle}\n"
+        file.write(s)
+
+        # Turn the current back on
+        s = f"M42 P0 S1\n"
         file.write(s)
 
         # Move into the working area
@@ -71,6 +76,7 @@ def to_gcode_axysimmetric(file_name, arr: list, origin: np.ndarray, material_siz
         xu = round(xu, decimals)
         yv = round(app[0][2], decimals)
         s = f"G1 X{xu} U{xu}\n"
+        s += f"M42 P0 S0\n"
         s += f"G1 F{slew} Y{yv} V{yv}\n"
         file.write(s)
 

@@ -4,14 +4,18 @@ print('Programm startet!')
 import locale
 locale.setlocale(locale.LC_NUMERIC, '')
 
+import json
+import numpy as np
 import trimesh
 from PyQt5 import QtWidgets, uic
 from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QFileDialog, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import QSpinBox, QDoubleSpinBox, QComboBox, QCheckBox
 import sys
 import vtk
 from vtkmodules.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
 
 from qtui import Ui_MainWindow
+import gcode as gc
 import slicer
 import utils as u
 
@@ -25,7 +29,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
         # Set up VTK rendering
         self.renderer = vtk.vtkRenderer()
-        self.renderer.SetBackground(1, 1, 1)
+        self.renderer.SetBackground(255/255, 240/255, 255/255)
         self.w_vtk_viewer.GetRenderWindow().AddRenderer(self.renderer)
         self.iren = self.w_vtk_viewer.GetRenderWindow().GetInteractor()
         self.iren.Initialize()
@@ -34,9 +38,45 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.b_open_file.clicked.connect(self.load_file)
         self.b_slice.clicked.connect(self.compute_coordinates)
 
+        # Set default parameter values
+        with open("preferences.json", "r") as file:
+            prefs = json.load(file)
+
+        spins = self.scrollArea.widget().findChildren(QSpinBox)
+        dblspins = self.scrollArea.widget().findChildren(QDoubleSpinBox)
+        combos = self.scrollArea.widget().findChildren(QComboBox)
+        checks = self.scrollArea.widget().findChildren(QCheckBox)
+        for key in prefs.keys():
+            val = prefs[key]
+            if isinstance(val, bool):
+                for check in checks:
+                    if key in check.objectName():
+                        check.setChecked(val)
+            elif isinstance(val, int):
+                for spin in spins:
+                    if key in spin.objectName():
+                        spin.setValue(val)
+                for dblspin in dblspins:
+                    if key in dblspin.objectName():
+                        dblspin.setValue(val)
+            elif isinstance(val, float):
+                for dblspin in dblspins:
+                    if key in dblspin.objectName():
+                        dblspin.setValue(val)
+            elif isinstance(val, str):
+                for combo in combos:
+                    if key in combo.objectName():
+                        combo.setCurrentText(val)
+            else:
+                u.msg("Invalid value in preferences.json", "error")
+                return
+    
     file_path = None
     file_name = None
     active_actors = {}
+
+    mesh = None
+    extents = None
 
     def load_file(self):
         self.file_path, _ = QFileDialog.getOpenFileName(self, 'Open File', '', 'All Files (*)')
@@ -53,13 +93,92 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def compute_coordinates(self):
         if self.file_path is None:
-            print("No File Path")
             #TODO show this in UI, maybe highlight button
-        else:
-            out = slicer.main(self.file_path, self.file_name)
-            if out.size != 0:
-                # self.render_pcd(out)
-                self.render_lcd(out)
+            print("No File Path")
+            return
+
+        self.mesh_pre_processing()
+        
+        if self.cb_algorithm_selector.currentText() == "Axisymmetric":
+            self.slice_axisymmetric()
+        elif self.cb_algorithm_selector.currentText() == "Linear":
+            self.slice_linear()
+
+    def check_argument_validity(self, widget):
+        # TODO
+        # Compare the argument to it's value in a reference dictionary and return 1 if invalid
+        return 0
+    
+    def mesh_pre_processing(self):
+        self.mesh = trimesh.load_mesh(self.file_path)
+        to_origin, self.extents = u.axis_oriented_extents(self.mesh)
+        self.mesh.apply_transform(to_origin)
+
+        # rad = math.pi
+        # matrix = trimesh.transformations.rotation_matrix(rad, [1, 0, 0], mesh_.centroid)
+        # mesh_ = mesh_.apply_transform(matrix)
+
+    def slice_axisymmetric(self):
+        u.msg("Running axysimmetric", "debug")
+        
+        # Check required arguments
+        err = 0
+        err += self.check_argument_validity(self.int_num_cuts)
+        err += self.check_argument_validity(self.int_points_per_cut)
+        err += self.check_argument_validity(self.float_kerf)
+        if err > 0:
+            u.msg("Invalid argument", "error")
+            return
+        
+        if self.cb_do_gcode.isChecked():
+            err = 0
+            err += self.check_argument_validity(self.int_material_size_x)
+            err += self.check_argument_validity(self.int_material_size_y)
+            err += self.check_argument_validity(self.int_material_size_z)
+            err += self.check_argument_validity(self.float_rotary_axis_origin_x)
+            err += self.check_argument_validity(self.float_rotary_axis_origin_x)
+            err += self.check_argument_validity(self.float_rotary_axis_origin_x)
+            err += self.check_argument_validity(self.int_feed)
+            err += self.check_argument_validity(self.int_slew)
+            if err > 0:
+                u.msg("Invalid argument", "error")
+                return
+
+        num_points = self.int_num_cuts.value() * self.int_points_per_cut.value()
+        out, coords = slicer.axysimmetric(self.mesh, self.int_num_cuts.value(), num_points, self.float_kerf.value())
+        if out.size != 0:
+            self.render_pcd(out)
+
+        if self.cb_do_gcode.isChecked():
+            material_size = np.asarray([self.int_material_size_x.value(), self.int_material_size_y.value(), self.int_material_size_z.value()])
+            rotary_axis_origin = np.asarray([self.float_rotary_axis_origin_x.value(), self.float_rotary_axis_origin_y.value(), self.float_rotary_axis_origin_z.value()])
+            mesh_origin = rotary_axis_origin + (self.extents[2] / 2)
+            gc.to_gcode_axysimmetric(self.file_name, coords, mesh_origin, material_size, self.int_feed.value(), self.int_slew.value())
+
+    def slice_linear(self):
+        u.msg("Running linear", "debug")
+        
+        # Check required arguments
+        err = 0
+        err += self.check_argument_validity(self.float_plane_data_x)
+        err += self.check_argument_validity(self.float_plane_data_pos_y)
+        err += self.check_argument_validity(self.float_plane_data_neg_y)
+        err += self.check_argument_validity(self.float_plane_data_pos_z)
+        err += self.check_argument_validity(self.float_plane_data_neg_z)
+        err += self.check_argument_validity(self.float_kerf)
+        if err > 0:
+            u.msg("Invalid argument", "error")
+            return
+        
+        motor_plane_data = np.asarray([self.float_plane_data_x.value(),
+                                       self.float_plane_data_pos_y.value(),
+                                       -self.float_plane_data_neg_y.value(),
+                                       self.float_plane_data_pos_z.value(),
+                                       -self.float_plane_data_neg_z.value()])
+        
+        out = slicer.linear(self.mesh, motor_plane_data, self.float_kerf.value())
+        if out.size != 0:
+            self.render_lcd(out)
 
     def render_actor(self, tag, actor: vtk.vtkActor):
         # Colored axes
