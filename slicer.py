@@ -5,31 +5,6 @@ import numpy as np
 import utils as u
 import vtk
 
-ORIGIN = np.asarray([444.5, 444.5, 400 + 450])
-# MATERIAL_SIZE = np.asarray([400, 600, 1450])
-MATERIAL_SIZE = np.asarray([280, 230, 800]) # Max höhe 1150, Min höhe 390
-
-def main(file_, name_):
-    mesh_ = trimesh.load_mesh(file_)
-
-    to_origin, mesh_extents = u.axis_oriented_extents(mesh_)
-    mesh_.apply_transform(to_origin)
-
-    # TODO error a sliced screw rotated by pi was cut with a left thread (practically mirrored)
-    # rad = math.pi
-    # matrix = trimesh.transformations.rotation_matrix(rad, [1, 0, 0], mesh_.centroid)
-    # mesh_ = mesh_.apply_transform(matrix)
-
-    # # Cache the extents
-    # global extents_ 
-    # extents_ = mesh_extents
-
-    motor_plane_data = np.asarray([387, 380, -390, 1200, -400])
-    # out = linear(mesh_, motor_plane_data, kerf=0.2)
-    out, coords = axysimmetric(mesh_, num_cuts=18, num_points=600*18, kerf=0.01)
-    gc.to_gcode_axysimmetric(name_, coords, ORIGIN, MATERIAL_SIZE, feed=200, slew=400)
-    return out
-
 def check_cut_validity_vertical_angle(plane_cuts: list, motor_planes, motor_plane_data):
     for i, (cut, ray_direction) in enumerate(plane_cuts):
         intersections = []
