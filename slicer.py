@@ -16,6 +16,7 @@ def check_cut_validity_vertical_angle(plane_cuts: list, motor_planes, motor_plan
         valid = True
         for intersect in intersections:
             if (
+                intersect is None or
                 intersect[1] >= motor_plane_data[1] or
                 intersect[1] <= motor_plane_data[2] or
                 intersect[2] >= motor_plane_data[3] or 
@@ -29,7 +30,7 @@ def check_cut_validity_vertical_angle(plane_cuts: list, motor_planes, motor_plan
         
     return None
     
-def linear(mesh_: trimesh.Trimesh, motor_plane_data: np.ndarray, kerf: float):
+def linear(mesh_: trimesh.Trimesh, motor_plane_data: np.ndarray, kerf: float, render_planes: bool):
     """motor_plane_data: array containing the following information:
     [x, positive y, negative y, positive z, negative z]
     where each value is relative to the mesh's origin, x defines position, y and z define size"""
@@ -42,29 +43,31 @@ def linear(mesh_: trimesh.Trimesh, motor_plane_data: np.ndarray, kerf: float):
     motor_planes = [u.plane(motor_planes_origins[0], motor_planes_normals[0]), u.plane(motor_planes_origins[1], motor_planes_normals[1])]
 
     # Visualize plane boundaries
-    out = [[[-motor_plane_data[0], motor_plane_data[1], motor_plane_data[3]], 
-        [-motor_plane_data[0], motor_plane_data[1], motor_plane_data[4]]],
-        [[-motor_plane_data[0], motor_plane_data[1], motor_plane_data[4]], 
-        [-motor_plane_data[0], motor_plane_data[2], motor_plane_data[4]]],
-        [[-motor_plane_data[0], motor_plane_data[2], motor_plane_data[4]], 
-        [-motor_plane_data[0], motor_plane_data[2], motor_plane_data[3]]],
-        [[-motor_plane_data[0], motor_plane_data[2], motor_plane_data[3]], 
-        [-motor_plane_data[0], motor_plane_data[1], motor_plane_data[3]]], # Left Plane
-        [[motor_plane_data[0], motor_plane_data[1], motor_plane_data[3]], 
-        [motor_plane_data[0], motor_plane_data[1], motor_plane_data[4]]],
-        [[motor_plane_data[0], motor_plane_data[1], motor_plane_data[4]], 
-        [motor_plane_data[0], motor_plane_data[2], motor_plane_data[4]]],
-        [[motor_plane_data[0], motor_plane_data[2], motor_plane_data[4]], 
-        [motor_plane_data[0], motor_plane_data[2], motor_plane_data[3]]],
-        [[motor_plane_data[0], motor_plane_data[2], motor_plane_data[3]], 
-        [motor_plane_data[0], motor_plane_data[1], motor_plane_data[3]]]] # Right Plane
+    if render_planes:
+        out = [[[-motor_plane_data[0], motor_plane_data[1], motor_plane_data[3]], 
+            [-motor_plane_data[0], motor_plane_data[1], motor_plane_data[4]]],
+            [[-motor_plane_data[0], motor_plane_data[1], motor_plane_data[4]], 
+            [-motor_plane_data[0], motor_plane_data[2], motor_plane_data[4]]],
+            [[-motor_plane_data[0], motor_plane_data[2], motor_plane_data[4]], 
+            [-motor_plane_data[0], motor_plane_data[2], motor_plane_data[3]]],
+            [[-motor_plane_data[0], motor_plane_data[2], motor_plane_data[3]], 
+            [-motor_plane_data[0], motor_plane_data[1], motor_plane_data[3]]], # Left Plane
+            [[motor_plane_data[0], motor_plane_data[1], motor_plane_data[3]], 
+            [motor_plane_data[0], motor_plane_data[1], motor_plane_data[4]]],
+            [[motor_plane_data[0], motor_plane_data[1], motor_plane_data[4]], 
+            [motor_plane_data[0], motor_plane_data[2], motor_plane_data[4]]],
+            [[motor_plane_data[0], motor_plane_data[2], motor_plane_data[4]], 
+            [motor_plane_data[0], motor_plane_data[2], motor_plane_data[3]]],
+            [[motor_plane_data[0], motor_plane_data[2], motor_plane_data[3]], 
+            [motor_plane_data[0], motor_plane_data[1], motor_plane_data[3]]]] # Right Plane
+    else:
+        out = []
 
     # Trimesh's trimesh.facets leaves out a lot of faces, so we had those back in manually
     facets_indices = mesh_.facets.copy()
     facet_faces = np.concatenate(facets_indices)
     all_faces = np.arange(len(mesh_.faces.copy()))
     missing_faces = np.setdiff1d(all_faces, facet_faces)
-
     for f in missing_faces:
         facets_indices.append(np.array([f]))
 
@@ -85,15 +88,12 @@ def linear(mesh_: trimesh.Trimesh, motor_plane_data: np.ndarray, kerf: float):
     # since Trimesh's facets.origins returns a random point on the facet
     facets_origins = np.asarray([verts.mean(axis=0) for verts in facets_vertices])
 
-    # # Visualize normals
-    # for i, normal in enumerate(facets_normals):
-    #     origin = facets_origins[i]
-    #     out.append(np.asarray([origin + normal, origin + normal * 2]))
-
     valid_cuts = []
+    pct_num = round(len(facets_indices) / 100)
     for i, facet_index in enumerate(facets_indices):
-        if i % 10000 == 0:
-            print(f"facet {i}\r")
+        if i % pct_num == 0:
+            u.msg(f"Completed {round(i / pct_num)}%", "debug", "\r")
+
         # Find the longest vertical line on each facet
         facet_origin = facets_origins[i]
         facet_normal = facets_normals[i]
@@ -142,7 +142,7 @@ def linear(mesh_: trimesh.Trimesh, motor_plane_data: np.ndarray, kerf: float):
             valid_idx = check_cut_validity_vertical_angle(cuts, motor_planes, motor_plane_data)
             if valid_idx is not None:
                 valid_cut = cuts[valid_idx]
-                valid_cuts.append([valid_cut, rad])
+                valid_cuts.append([valid_cut[0][0], valid_cut[0][1], valid_cut[1], rad])
                 break
             else:
                 # Try again with rotations around the vertical axis
@@ -153,9 +153,165 @@ def linear(mesh_: trimesh.Trimesh, motor_plane_data: np.ndarray, kerf: float):
                     cuts.append([new_cut, new_dir])
                 rad += offset_rad  
 
-    for cut, rad in valid_cuts:
-        if rad == 0:
-            out.append(cut[0])
+    u.msg(f"Completed 100%", "debug")
+
+    # Valid cuts: 
+    # 0,1 --> Two points making up the cut
+    # 2 --> Facet normal
+    # 3 --> Rotary axis angle rad
+    
+    # Find paths between cuts that don't intersect the mesh.
+    # TODO: eventually improve this with a pathfinding algo like A*
+    
+    plane_normal = np.asarray([0, 0, 1])
+    proj = mesh_.projected(plane_normal).vertices
+    ps = []
+    for p in proj:
+        ps.append(np.asarray([p[0], p[1], 0]))
+
+    for i, p in enumerate(ps):
+        out.append([p, p])
+
+    # valid_cuts = [[np.asarray([0, 0, 0]), np.asarray([1, 1, 1]), np.asarray([0, 0, 1]), 0]]
+    exit_paths = []
+    for i, cut0 in enumerate(valid_cuts):
+        # Get the end pos of the last and start pos of the new cut
+        pos0 = cut0[1]
+        if i == len(valid_cuts) - 1:
+            cut1 = valid_cuts[0]
+        else:
+            cut1 = valid_cuts[i + 1]
+        pos1 = cut1[0]
+
+        cut_vector = pos1 - pos0
+        # projection_plane_normal = u.normalize(np.cross(cut_vector, np.asarray([0, 0, 1])))
+        projection_plane_normal = u.normalize(cut0[2]) # TODO why th does this work!?
+        silhouette_2d = mesh_.projected(projection_plane_normal).vertices.view(np.ndarray)
+        silhouette_3d = np.hstack((silhouette_2d, np.zeros((silhouette_2d.shape[0], 1))))
+
+        T = trimesh.geometry.align_vectors([0, 0, 1], projection_plane_normal)
+        silhouette_3d = trimesh.transform_points(silhouette_3d, T)
+
+        # TODO Make sure this is working properly
+        silhouette_3d += projection_plane_normal * np.dot(pos0, projection_plane_normal)
+
+        if i < 20:
+            continue
+        out = silhouette_3d
+        out = np.append(out, pos1.reshape(1, 3), axis=0)
+        out = np.append(out, pos0.reshape(1, 3), axis=0)
+        return out
+
+        # # TODO this is meant to find the path along the silhouette from pos0 to pos1, but for some reason it always finds pos1 right away
+        # visited = []
+        # sphere_radius = 0.5
+        # max_sphere_radius = 10
+        # current_point = pos0
+        # silhouette_3d = np.append(silhouette_3d, pos1.reshape(1, 3), axis=0)
+        # while not np.array_equal(current_point, pos1):
+        #     if len(visited) > 0:
+        #         print(len(visited))
+        #     visited.append(current_point)
+        #     dir_vector = u.normalize(pos1 - current_point)
+
+        #     valid_next = []
+        #     sphere_radius_multiplier = 1
+        #     while len(valid_next) == 0 and sphere_radius < max_sphere_radius:
+        #         exit = False
+        #         for p in silhouette_3d:
+        #             if np.array_equal(p, pos1):
+        #                 exit = True
+        #                 break
+        #             if any(np.array_equal(p, v) for v in visited):
+        #                 continue
+        #             if u.sphere_SDF(current_point, p, sphere_radius * sphere_radius_multiplier) <= 0:
+        #                 valid_next.append(np.asarray(p))
+        #                 continue
+        #         if exit:
+        #             break
+        #         sphere_radius_multiplier += 1
+        #     if exit:
+        #         break
+
+        #     best_next = None
+        #     min_angle = np.inf
+        #     for p in valid_next:
+        #         dir = u.normalize(p - current_point)
+        #         angle = u.vector_angle(dir, dir_vector)
+        #         if angle < min_angle:
+        #             min_angle = angle
+        #             best_next = p
+
+        #     current_point = best_next
+
+        # print(pos0, pos1)
+        # print(visited)
+
+    # Shoot a ray from the cut, and follow its reflections until a valid exit path is found
+#     exit_paths = []
+#     for i, cut0 in enumerate(valid_cuts):
+#         # Get the end pos of the last and start pos of the new cut
+#         pos0 = cut0[1]
+#         dir_0 = np.cross(cut0[1] - cut0[0], cut0[2])
+#         ray_directions_0 = [dir_0, -dir_0]
+#         if i == len(valid_cuts) - 1:
+#             cut1 = valid_cuts[0]
+#         else:
+#             cut1 = valid_cuts[i + 1]
+#         pos1 = cut1[0]
+#         dir_1 = np.cross(cut1[1] - cut1[0], cut1[2])
+#         ray_directions_1 = [dir_1, -dir_1]
+        
+#         # Raycast to check for collisions between positions
+#         # TODO: cast in a circle with radius k to avoid getting too close to the mesh
+#         ray_origins = [pos0]
+#         ray_directions = [pos1 - pos0]
+#         hit = Intersector.intersects_any(ray_origins, ray_directions)
+#         if np.any(hit):
+#             u.msg(f"Skipped idx {i}, {i + 1}", "debug")
+#             continue
+        
+#         # Collisions from wire angle
+#         valid_rotation = None
+
+#         valid = True
+#         ray_origins = [pos1, pos1]
+#         hit = Intersector.intersects_any(ray_origins, ray_directions_0)
+#         if not np.any(hit):
+#             # set valid rotation to pos0's
+#             valid_rotation = dir_0
+#         else:
+#             ray_origins = [pos0, pos0]
+#             hit = Intersector.intersects_any(ray_origins, ray_directions_1)
+#             if not np.any(hit):
+#                 # set valid rotation to pos1's
+#                 valid_rotation = dir_1
+#             else:
+#                 valid = False
+
+#         if not valid:
+#             # Check with average rotation
+#             avg_dir = u.normalize(dir_0 + dir_1)
+#             ray_directions = [avg_dir, -avg_dir]
+#             ray_origins = [pos0, pos0, pos1, pos1]
+#             hit = Intersector.intersects_any(ray_origins, ray_directions_0)
+#             if not np.any(hit):
+#                 # set valid rotation to the avg
+#                 valid_rotation = avg_dir
+#             else:
+#                 u.msg(f"Invalid rotation between idx {i}, {i + 1}", "debug")
+#                 continue
+        
+#         # Valid cut with valid rotation --> just pass it to the output
+#         exit_paths.append(cut1)
+
+    # Sort the cuts by motor position TODO
+    position_zero = [0, 0, 0, 0]
+
+    
+    for cut in valid_cuts:
+        if cut[3] == 0:
+            out.append([cut[0], cut[1]])
     print(len(out))
     return np.asarray(out)
 

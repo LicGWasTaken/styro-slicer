@@ -82,19 +82,19 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.file_path, _ = QFileDialog.getOpenFileName(self, 'Open File', '', 'All Files (*)')
         
         if not self.file_path:
-            print('No file selected')
+            u.msg("No file selected", "warning")
             self.t_selected_file.setText("None")
         else:
-            print(f'Selected file: {self.file_path}')
-            self.file_name = self.file_path.rsplit('/', 1)[1]
+            u.msg(f"Selected file: {self.file_path}", "debug")
+            self.file_name = self.file_path.rsplit("/", 1)[1]
             self.t_selected_file.setText(self.file_name)
             self.render_stl(self.file_path)
             # TODO check for valid file extension
 
     def compute_coordinates(self):
         if self.file_path is None:
-            #TODO show this in UI, maybe highlight button
-            print("No File Path")
+            # TODO show this in UI, maybe highlight button
+            u.msg("Missing file path", "warning")
             return
 
         self.mesh_pre_processing()
@@ -160,6 +160,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         
         # Check required arguments
         err = 0
+        err += self.check_argument_validity(self.cb_render_planes)
         err += self.check_argument_validity(self.float_plane_data_x)
         err += self.check_argument_validity(self.float_plane_data_pos_y)
         err += self.check_argument_validity(self.float_plane_data_neg_y)
@@ -176,9 +177,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
                                        self.float_plane_data_pos_z.value(),
                                        -self.float_plane_data_neg_z.value()])
         
-        out = slicer.linear(self.mesh, motor_plane_data, self.float_kerf.value())
+        out = slicer.linear(self.mesh, motor_plane_data, self.float_kerf.value(), self.cb_render_planes.isChecked())
         if out.size != 0:
-            self.render_lcd(out)
+            self.render_pcd(out)
 
     def render_actor(self, tag, actor: vtk.vtkActor):
         # Colored axes

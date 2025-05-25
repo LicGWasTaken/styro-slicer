@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>MainWindow</string>
+   <string>XPS-Slicer</string>
   </property>
   <property name="styleSheet">
    <string notr="true">QMainWindow {
@@ -348,9 +348,9 @@ QPushButton {
      <property name="geometry">
       <rect>
        <x>0</x>
-       <y>-225</y>
+       <y>0</y>
        <width>375</width>
-       <height>653</height>
+       <height>680</height>
       </rect>
      </property>
      <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -467,7 +467,7 @@ QPushButton {
          <item row="5" column="1">
           <widget class="QCheckBox" name="cb_do_gcode">
            <property name="text">
-            <string>Enabled</string>
+            <string>Enable</string>
            </property>
            <property name="tristate">
             <bool>false</bool>
@@ -538,7 +538,7 @@ QPushButton {
          <item row="0" column="1">
           <widget class="QSpinBox" name="spinBox_2"/>
          </item>
-         <item row="1" column="0" colspan="2">
+         <item row="2" column="0" colspan="2">
           <widget class="QGroupBox" name="gb_motor_plane_data">
            <property name="font">
             <font>
@@ -635,6 +635,20 @@ QPushButton {
              </widget>
             </item>
            </layout>
+          </widget>
+         </item>
+         <item row="1" column="0">
+          <widget class="QLabel" name="label">
+           <property name="text">
+            <string>Render Motor Planes</string>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="1">
+          <widget class="QCheckBox" name="cb_render_planes">
+           <property name="text">
+            <string>Enable</string>
+           </property>
           </widget>
          </item>
         </layout>

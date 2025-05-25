@@ -96,11 +96,15 @@ def magnitude(v):
     try:
         return math.sqrt(v[0]**2 + v[1]**2 + v[2]**2)
     except:
+        print(v)
         return math.sqrt(v[0]**2 + v[1]**2)
 
 def normalize(v: np.ndarray):
     return v / magnitude(v)
-    
+
+def vector_angle(v0: np.ndarray, v1: np.ndarray):
+    return math.acos(np.dot(v0, v1) / (magnitude(v0) * magnitude(v1)))
+
 def clamp(n, min, max):
     return min * (n < min) + max * (n > max) + n * (n >= min and n <= max)
 

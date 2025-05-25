@@ -1,16 +1,17 @@
 {
-    "kerf": 0.5,
+    "kerf": 0.01,
     "feed": 200,
     "slew": 500,
     "material_size_x": 400,
     "material_size_y": 600,
     "material_size_z": 1450,
     "algorithm": "Axisymmetric",
-    "do_gcode": true,
+    "do_gcode": false,
 
     "num_cuts": 12,
     "points_per_cut": 100,
 
+    "render_planes": false,
     "plane_data_x": 444.5,
     "plane_data_pos_y": 380,
     "plane_data_neg_y": 390,
