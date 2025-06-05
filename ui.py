@@ -29,7 +29,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
         # Set up VTK rendering
         self.renderer = vtk.vtkRenderer()
-        self.renderer.SetBackground(255/255, 240/255, 255/255)
+        self.renderer.SetBackground(255/255, 200/255, 255/255)
         self.w_vtk_viewer.GetRenderWindow().AddRenderer(self.renderer)
         self.iren = self.w_vtk_viewer.GetRenderWindow().GetInteractor()
         self.iren.Initialize()

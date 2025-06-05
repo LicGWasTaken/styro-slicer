@@ -1,0 +1,7 @@
+PyQt5
+vtk
+trimesh[all]
+numpy
+colorama
+steputils
+cadquery
