@@ -1,3 +1,15 @@
+# Installation
+
+* Download and install git: https://git-scm.com/downloads/win
+* Download and install python 3.13.2 and add it to PATH during the installation
+* Open command prompt
+* Navigate to your installation folder e.g. C:\Users\slicer
+  - From your current folder, use ```cd <folder_name>``` to move to the installation folder (```C:\Users> cd slicer```)
+  - Use ```cd ..``` to navigate back if needed (```C:\Users\slicer> cd ..```)
+* run ```git clone https://github.com/LicGWasTaken/styro-slicer```
+* run ```python ui.py``` to start the program
+
+
 ## User Parameters
 * ***kerf*** - offset in mm from the contour of the mesh. Dependent on wire diameter, resistance and current.
 * ***feed*** - cutting speed (mm/min)
