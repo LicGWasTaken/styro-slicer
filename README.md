@@ -6,9 +6,11 @@
 * Navigate to your installation folder e.g. C:\Users\slicer
   - From your current folder, use ```cd <folder_name>``` to move to the installation folder (```C:\Users> cd slicer```)
   - Use ```cd ..``` to navigate back if needed (```C:\Users\slicer> cd ..```)
-* run ```git clone https://github.com/LicGWasTaken/styro-slicer```
-* run ```python ui.py``` to start the program
-
+* Run ```git clone https://github.com/LicGWasTaken/styro-slicer```
+* Create a virtual environment ```python -m venv venv```
+* Activate the environment ```venv\Scripts\activate```
+* Install dependences ```python -m pip install -r requirements.txt```
+* Run ```python ui.py``` to start the program
 
 ## User Parameters
 * ***kerf*** - offset in mm from the contour of the mesh. Dependent on wire diameter, resistance and current.
